@@ -20,7 +20,13 @@
 
   .topbar{background:var(--brand-dark);color:#fff;padding:clamp(10px,1vw,18px) clamp(18px,1.8vw,34px);display:flex;align-items:center;gap:clamp(16px,1.6vw,30px);flex:0 0 auto;flex-wrap:wrap;}
   .topbar h1{margin:0;font-size:clamp(22px,2.1vw,34px);font-weight:800;letter-spacing:-.2px;white-space:nowrap;}
-  .topbar .updated{font-size:clamp(13px,1.05vw,18px);opacity:.8;margin-left:auto;white-space:nowrap;}
+  .topbar .updated{font-size:clamp(13px,1.05vw,18px);opacity:.8;margin-left:auto;white-space:nowrap;display:flex;align-items:center;gap:8px;}
+  .topbar .updated .pulse{width:10px;height:10px;border-radius:50%;background:#4ADE80;box-shadow:0 0 0 0 rgba(74,222,128,.7);animation:pulse 2s infinite;}
+  @keyframes pulse{
+    0%   { box-shadow:0 0 0 0 rgba(74,222,128,.7); }
+    70%  { box-shadow:0 0 0 10px rgba(74,222,128,0); }
+    100% { box-shadow:0 0 0 0 rgba(74,222,128,0); }
+  }
   .kpis{display:flex;gap:clamp(10px,1vw,20px);flex:1;flex-wrap:nowrap;min-width:0;}
   .kpi{background:rgba(255,255,255,.08);border-radius:12px;padding:clamp(7px,.7vw,13px) clamp(14px,1.4vw,26px);min-width:0;flex:1 1 170px;}
   .kpi-label{font-size:clamp(13px,1.05vw,18px);font-weight:800;text-transform:uppercase;letter-spacing:.3px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -132,7 +138,7 @@
 <div class="topbar">
   <h1>🗂️ NEO</h1>
   <div class="kpis" id="kpis"></div>
-  <span class="updated" id="updated-at">Carregando…</span>
+  <span class="updated" id="updated-at"><span class="pulse"></span>Carregando…</span>
 </div>
 
 <div id="loading">Carregando dados…</div>
@@ -351,7 +357,6 @@ function renderDashboard(state){
 
   const totalBalance = cards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
 
-  /* Horas abatidas = schedules concluídas com cardId e deductMinutes != 0 */
   let totalAbatidoMin = 0;
   schedules.forEach(s=>{
     if(s.status!=='concluida') return;
@@ -597,27 +602,110 @@ function chartCardCarousel(icon, title, desc, carouselId, bodyHtml){
 function prazoKpi(icon, label, value, sub){
   return '<div class="prazo-kpi"><div class="prazo-kpi-label">'+icon+' '+esc(label)+'</div><div class="prazo-kpi-value">'+esc(value)+'</div><div class="prazo-kpi-sub">'+esc(sub)+'</div></div>';
 }
+
+/* ============================================================
+   CARREGAMENTO
+   ============================================================ */
 async function loadAndRender(){
+  const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
+  if(error) throw error;
+  if(!data || !data.data) throw new Error('Nenhum dado encontrado na tabela app_state.');
+
+  renderDashboard(data.data);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  const upd = data.updated_at ? new Date(data.updated_at) : new Date();
+  document.getElementById('updated-at').innerHTML =
+    '<span class="pulse"></span>' + upd.toLocaleTimeString('pt-BR') + ' · atualiza a cada 1 min';
+}
+
+/* ============================================================
+   LOOP DE ATUALIZAÇÃO RESILIENTE
+   - setTimeout recursivo (não atropela se a rede estiver lenta)
+   - Reagenda mesmo se a query falhar
+   - Força refresh quando a aba/TV volta ao foco (visibilitychange/focus)
+   - Rede de segurança a cada 15s detecta timer travado
+   - Auto-reload após 30 min sem conseguir atualizar
+   ============================================================ */
+let refreshTimer = null;
+let lastRefreshAt = 0;
+let refreshInFlight = false;
+let firstLoadDone = false;
+
+async function refreshLoop(){
+  if(refreshInFlight) return;
+  refreshInFlight = true;
+  const startedAt = Date.now();
   try{
-    const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
-    if(error) throw error;
-    if(!data || !data.data){ throw new Error('Nenhum dado encontrado na tabela app_state.'); }
-    renderDashboard(data.data);
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    const upd = data.updated_at ? new Date(data.updated_at) : new Date();
-    document.getElementById('updated-at').textContent = upd.toLocaleTimeString('pt-BR') + ' · a cada 1 min';
+    await loadAndRender();
+    lastRefreshAt = Date.now();
+    firstLoadDone = true;
   } catch(err){
-    console.error(err);
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'flex';
-    document.getElementById('error').textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
+    console.error('[NEO] refresh falhou:', err);
+    // Se nunca conseguimos carregar, mostramos o erro na tela
+    if(!firstLoadDone){
+      document.getElementById('loading').style.display = 'none';
+      const errEl = document.getElementById('error');
+      errEl.style.display = 'flex';
+      errEl.textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
+    }
+    // Mesmo assim, marca o timestamp para o watchdog não disparar reload prematuro
+    lastRefreshAt = Date.now();
+  } finally {
+    refreshInFlight = false;
+    const elapsed = Date.now() - startedAt;
+    const wait = Math.max(2000, REFRESH_MS - elapsed);
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refreshLoop, wait);
   }
 }
-loadAndRender();
-setInterval(loadAndRender, REFRESH_MS);
-window.addEventListener('resize', ()=>{ if(document.getElementById('app').style.display!=='none') loadAndRender(); });
+
+/* Força refresh imediato quando a aba/TV volta a ficar visível */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible'){
+    const stale = Date.now() - lastRefreshAt > REFRESH_MS;
+    if(stale && !refreshInFlight){
+      clearTimeout(refreshTimer);
+      refreshLoop();
+    }
+  }
+});
+
+/* Watchdog: se o timer travou (TV em standby, throttling agressivo),
+   detecta em até 15s e dispara refresh manual. */
+setInterval(()=>{
+  if(refreshInFlight) return;
+  const stale = Date.now() - lastRefreshAt > REFRESH_MS * 2;
+  if(stale){
+    console.warn('[NEO] timer atrasado — forçando refresh');
+    clearTimeout(refreshTimer);
+    refreshLoop();
+  }
+}, 15000);
+
+/* Volta do foco da janela (TV com controle remoto trocando de app) */
+window.addEventListener('focus', ()=>{
+  const stale = Date.now() - lastRefreshAt > REFRESH_MS;
+  if(stale && !refreshInFlight){
+    clearTimeout(refreshTimer);
+    refreshLoop();
+  }
+});
+
+/* Recarrega a página inteira se ficar 30 min sem conseguir atualizar */
+setInterval(()=>{
+  const deadFor = Date.now() - lastRefreshAt;
+  if(deadFor > 30 * 60 * 1000){
+    console.warn('[NEO] sem atualização há 30 min — recarregando');
+    location.reload();
+  }
+}, 60000);
+
+/* Boot inicial */
+refreshLoop();
 </script>
 </body>
 </html>
