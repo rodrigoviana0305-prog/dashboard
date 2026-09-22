@@ -15,8 +15,8 @@
     --shadow-1:0 2px 8px rgba(23,50,77,.06),0 1px 2px rgba(23,50,77,.04);
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;overflow:hidden;}
-  body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:13px;display:flex;flex-direction:column;}
+  html,body{margin:0;background:var(--bg);}
+  body{color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:13px;min-height:100vh;display:flex;flex-direction:column;}
 
   .topbar{background:var(--brand-dark);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:18px;flex:0 0 auto;flex-wrap:wrap;}
   .topbar h1{margin:0;font-size:15px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;}
@@ -26,9 +26,9 @@
   .kpi-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;opacity:.75;}
   .kpi-value{font-size:19px;font-weight:800;line-height:1.25;}
 
-  .main{flex:1;display:flex;gap:10px;padding:10px;min-height:0;}
+  .main{flex:0 0 auto;display:flex;gap:10px;padding:10px;min-height:min(640px,78vh);}
   .charts-area{flex:1 1 72%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;min-height:0;min-width:0;}
-  .agenda-panel{flex:0 0 26%;max-width:340px;min-width:230px;display:flex;flex-direction:column;min-height:0;}
+  .agenda-panel{flex:0 0 27%;max-width:360px;min-width:240px;display:flex;flex-direction:column;min-height:0;}
 
   .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-1);
         display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:10px 14px;}
@@ -39,24 +39,51 @@
   .empty{padding:14px;text-align:center;color:var(--ink-faint);font-size:11.5px;background:var(--surface-2);border-radius:8px;border:1px dashed var(--border);}
 
   .bar-row{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:7px;font-size:11px;margin-bottom:6px;}
-  .bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px;}
   .bar-track{background:var(--surface-2);border-radius:999px;height:8px;overflow:hidden;}
   .bar-fill{height:100%;border-radius:999px;background:var(--brand);}
   .bar-value{text-align:right;font-weight:800;white-space:nowrap;font-size:10.5px;}
   .neg{color:var(--danger);} .pos{color:var(--ok);}
+  .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
 
-  .agenda-item{border-left:3px solid var(--brand);background:var(--surface-2);border-radius:0 8px 8px 0;padding:6px 9px;margin-bottom:7px;}
-  .agenda-item.done{border-left-color:var(--ok);opacity:.75;}
-  .agenda-time{font-size:10px;font-weight:800;color:var(--brand-dark);}
-  .agenda-client{font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .agenda-meta{font-size:9.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* ---- Agenda do dia — estilo Google Agenda ---- */
+  .agenda-allday{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+  .agenda-allday-chip{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cal-grid-wrap{position:relative;flex:1;min-height:0;overflow-y:auto;border-top:1px solid var(--border);}
+  .cal-grid{position:relative;}
+  .cal-hour-line{position:absolute;left:38px;right:0;border-top:1px solid var(--border);}
+  .cal-hour-label{position:absolute;left:0;top:-6px;width:34px;font-size:9px;color:var(--ink-faint);text-align:right;padding-right:4px;}
+  .cal-now-line{position:absolute;left:38px;right:0;height:2px;background:var(--danger);z-index:5;}
+  .cal-now-line::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--danger);}
+  .cal-event{position:absolute;border-radius:5px;padding:2px 5px;overflow:hidden;font-size:9.5px;line-height:1.25;box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:default;}
+  .cal-event .t{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cal-event .c{opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .agenda-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:9px;color:var(--ink-soft);}
+  .agenda-legend span{display:inline-flex;align-items:center;gap:3px;}
 
-  #loading, #error{flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);}
+  /* ---- Seções abaixo dos gráficos ---- */
+  .below-wrap{padding:0 10px 16px;display:flex;flex-direction:column;gap:14px;}
+  .below-wrap .card{padding:16px 18px;}
+  .below-wrap .card h2{font-size:14px;}
+  .analyst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+  .analyst-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;border-left:4px solid var(--brand);background:var(--surface-2);}
+  .analyst-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .analyst-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;flex:0 0 auto;}
+  .analyst-name{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .analyst-stats{display:flex;gap:14px;}
+  .analyst-stat-num{font-size:16px;font-weight:800;color:var(--brand-dark);}
+  .analyst-stat-lbl{font-size:9px;color:var(--ink-faint);text-transform:uppercase;}
+  .prazo-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .prazo-kpi{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+  .prazo-kpi-label{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--ink-faint);}
+  .prazo-kpi-value{font-size:20px;font-weight:800;color:var(--brand-dark);}
+  .prazo-kpi-sub{font-size:10.5px;color:var(--ink-soft);}
+
+  #loading, #error{flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);min-height:200px;}
   #error{color:var(--danger);display:none;}
 
   @media screen and (max-width:900px){
-    html,body{overflow:auto;}
-    .main{flex-direction:column;}
+    .main{flex-direction:column;height:auto;min-height:0;}
     .charts-area{grid-template-columns:1fr;grid-template-rows:none;}
     .agenda-panel{max-width:none;}
   }
@@ -72,13 +99,29 @@
 
 <div id="loading">Carregando dados…</div>
 <div id="error"></div>
-<div class="main" id="app" style="display:none;">
-  <div class="charts-area" id="charts-area"></div>
-  <div class="agenda-panel">
-    <div class="card" style="flex:1;">
-      <h2>📅 Agenda do dia</h2>
-      <p class="desc" id="agenda-date"></p>
-      <div class="card-body" id="agenda-list"></div>
+<div id="app" style="display:none;">
+  <div class="main">
+    <div class="charts-area" id="charts-area"></div>
+    <div class="agenda-panel">
+      <div class="card" style="flex:1;">
+        <h2>📅 Agenda do dia</h2>
+        <p class="desc" id="agenda-date"></p>
+        <div id="agenda-allday" class="agenda-allday"></div>
+        <div class="cal-grid-wrap" id="cal-grid-wrap"><div class="cal-grid" id="cal-grid"></div></div>
+        <div class="agenda-legend" id="agenda-legend"></div>
+      </div>
+    </div>
+  </div>
+  <div class="below-wrap">
+    <div class="card">
+      <h2>👤 Desempenho por analista</h2>
+      <p class="desc">Sessões concluídas e horas realizadas neste mês.</p>
+      <div id="analyst-performance"></div>
+    </div>
+    <div class="card">
+      <h2>⏱ Tempo entre Comercial e Início da implantação</h2>
+      <p class="desc">Dias corridos entre a Data do Comercial (envio do contrato) e o Início da implantação — considera apenas cards com as duas datas preenchidas.</p>
+      <div id="prazo-kpis"></div>
     </div>
   </div>
 </div>
@@ -87,6 +130,7 @@
 const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
 const REFRESH_MS = 60000;
+const EXCLUDE_ANALYST_NAMES = ['sabrina']; // nomes (minúsculo) ocultos do painel "Desempenho por analista"
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -105,13 +149,25 @@ function countWeekdaysBetweenISO(startIso, endIso){
   while(cur <= end){ if(cur.getDay()!==0 && cur.getDay()!==6) count++; cur.setDate(cur.getDate()+1); }
   return count;
 }
+function daysBetweenISO(a,b){
+  const pa=a.split('-').map(Number), pb=b.split('-').map(Number);
+  return Math.round((Date.UTC(pb[0],pb[1]-1,pb[2])-Date.UTC(pa[0],pa[1]-1,pa[2]))/86400000);
+}
+function fmtDias(n){ return (Math.round(n*10)/10).toLocaleString('pt-BR')+(Math.abs(n)===1?' dia':' dias'); }
 function minToHM(min){
   const sign = min<0?'-':''; min = Math.abs(Math.round(min));
   const h = Math.floor(min/60), m = min%60;
   return sign + (m ? h+'h'+String(m).padStart(2,'0') : h+'h');
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtDateBR(iso){ const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function fmtDateBR(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function readableTextColor(hex){
+  if(!hex) return '#fff';
+  const h = hex.replace('#','');
+  const r=parseInt(h.substr(0,2),16), g=parseInt(h.substr(2,2),16), b=parseInt(h.substr(4,2),16);
+  const lum = (0.299*r+0.587*g+0.114*b)/255;
+  return lum > 0.6 ? '#17324D' : '#fff';
+}
 
 const FERIAS_TYPE_NAME = 'Férias';
 const FERIAS_MIN_PER_WEEKDAY = 8*60+48;
@@ -144,10 +200,36 @@ function barList(items, colorFn){
   const max = Math.max(1, ...items.map(i=>i.value));
   return items.map(i=>{
     const pct = Math.round((i.value/max)*100);
-    return '<div class="bar-row"><div class="bar-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
+    return '<div class="bar-row"><div class="bar-label" title="'+esc(i.label)+'">'+(i.dot?'<span class="dot" style="background:'+i.dot+';"></span>':'')+esc(i.label)+'</div>'
       + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(colorFn?colorFn(i):'var(--brand)')+';"></div></div>'
       + '<div class="bar-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div></div>';
   }).join('');
+}
+
+/* ---- Empacotamento de eventos sobrepostos (mesmo algoritmo do Implanta) ---- */
+function layoutDayEvents(scheds){
+  const items = scheds.map(s=>({ s, start:timeToMin(s.startTime), end:Math.max(timeToMin(s.endTime), timeToMin(s.startTime)+15) }))
+    .sort((a,b)=> a.start-b.start || a.end-b.end);
+  const clusters = [];
+  let current = [], clusterEnd = -1;
+  items.forEach(it=>{
+    if(current.length && it.start >= clusterEnd){ clusters.push(current); current = []; }
+    current.push(it);
+    clusterEnd = Math.max(clusterEnd, it.end);
+  });
+  if(current.length) clusters.push(current);
+  const result = [];
+  clusters.forEach(cluster=>{
+    const lanes = [];
+    cluster.forEach(it=>{
+      let laneIdx = lanes.findIndex(endT=> it.start >= endT);
+      if(laneIdx===-1){ laneIdx = lanes.length; lanes.push(it.end); } else { lanes[laneIdx] = it.end; }
+      it.lane = laneIdx;
+    });
+    const totalLanes = lanes.length;
+    cluster.forEach(it=> result.push({sched:it.s, start:it.start, end:it.end, lane:it.lane, lanes:totalLanes}));
+  });
+  return result;
 }
 
 function renderDashboard(state){
@@ -158,6 +240,7 @@ function renderDashboard(state){
   const monthRange = currentMonthRange();
   const today = todayISO();
 
+  /* ---- KPIs (topo) ---- */
   const totalBalance = cards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
   const naoAbatidoByClient = {};
   schedules.forEach(s=>{
@@ -173,31 +256,18 @@ function renderDashboard(state){
     + kpi('⏳','Saldo total disponível', minToHM(totalBalance*60), totalBalance<0)
     + kpi('⚑','Horas sem abatimento', minToHM(totalNaoAbatido));
 
-  const todaySchedules = schedules.filter(s=> s.status!=='nao_realizada' && H.scheduleSpansDate(s, today))
-    .sort((a,b)=> (a.allDay?'':a.startTime||'').localeCompare(b.allDay?'':b.startTime||''));
-  document.getElementById('agenda-date').textContent = fmtDateBR(today);
-  if(!todaySchedules.length){
-    document.getElementById('agenda-list').innerHTML = '<div class="empty">Nenhuma agenda para hoje.</div>';
-  } else {
-    document.getElementById('agenda-list').innerHTML = todaySchedules.map(s=>{
-      const client = s.clientId ? byId(clients, s.clientId) : null;
-      const analystNames = H.scheduleAnalystIds(s).map(id=>{ const a=byId(analysts,id); return a?a.name:'—'; }).join(', ');
-      const timeText = s.allDay ? 'Dia todo' : (s.startTime||'')+(s.endTime?'–'+s.endTime:'');
-      const cls = s.status==='concluida' ? 'done' : '';
-      return '<div class="agenda-item '+cls+'"><div class="agenda-time">'+esc(timeText)+' · '+esc(s.type||'')+'</div>'
-        + '<div class="agenda-client">'+esc(client?client.name:'(sem cliente)')+'</div>'
-        + '<div class="agenda-meta">'+esc(analystNames||'—')+'</div></div>';
-    }).join('');
-  }
+  /* ---- Agenda do dia — estilo Google Agenda ---- */
+  renderAgendaDoDia(state, H, today, clients, analysts);
 
+  /* ---- Gráficos (2x2) ---- */
   let chartsHtml = '';
 
   const analystItems = analysts.map(a=>{
     const mins = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange))
       .reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
-    return {label:a.name, value:mins, display:minToHM(mins), inactive:a.inactive};
+    return {label:a.name, value:mins, display:minToHM(mins), dot:a.inactive?'#B9CAD5':a.color};
   }).sort((x,y)=>y.value-x.value).slice(0,6);
-  chartsHtml += chartCard('⏱','Horas dos analistas','Concluídas neste mês', barList(analystItems, i=>i.inactive?'#B9CAD5':'var(--brand)'));
+  chartsHtml += chartCard('⏱','Horas dos analistas','Concluídas neste mês', barList(analystItems, i=>i.dot||'var(--brand)'));
 
   const balRows = activeCards.map(c=>({client:byId(clients,c.clientId), bal:H.cardBalanceHours(c)}))
     .filter(r=>r.client).sort((a,b)=>a.bal-b.bal).slice(0,6)
@@ -216,6 +286,136 @@ function renderDashboard(state){
   chartsHtml += chartCard('⚑','Ranking sem abatimento','Horas internas não descontadas do saldo', barList(naoAbatidoItems, ()=>'var(--purple)'));
 
   document.getElementById('charts-area').innerHTML = chartsHtml;
+
+  /* ---- Desempenho por analista (abaixo), excluindo nomes de EXCLUDE_ANALYST_NAMES ---- */
+  const perfAnalysts = analysts.filter(a=> !EXCLUDE_ANALYST_NAMES.some(n=> (a.name||'').trim().toLowerCase().includes(n)));
+  if(!perfAnalysts.length){
+    document.getElementById('analyst-performance').innerHTML = '<div class="empty">Nenhum analista para exibir.</div>';
+  } else {
+    const rows = perfAnalysts.map(a=>{
+      const scheds = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange));
+      const totalMin = scheds.reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
+      const board = boards.find(b=>b.analystId===a.id);
+      const cardCount = board ? cards.filter(c=>c.boardId===board.id).length : 0;
+      return {a, sessions:scheds.length, totalMin, cardCount};
+    }).sort((x,y)=> y.totalMin-x.totalMin);
+    document.getElementById('analyst-performance').innerHTML = '<div class="analyst-grid">' + rows.map(({a,sessions,totalMin,cardCount})=>{
+      return '<div class="analyst-card" style="border-left-color:'+(a.inactive?'#B9CAD5':a.color)+';">'
+        + '<div class="analyst-card-head"><div class="analyst-avatar" style="background:'+(a.inactive?'#B9CAD5':a.color)+';">'+esc((a.name||'?').charAt(0).toUpperCase())+'</div>'
+        + '<div class="analyst-name">'+esc(a.name)+'</div></div>'
+        + '<div class="analyst-stats">'
+        +   '<div><div class="analyst-stat-num">'+cardCount+'</div><div class="analyst-stat-lbl">Clientes</div></div>'
+        +   '<div><div class="analyst-stat-num">'+sessions+'</div><div class="analyst-stat-lbl">Sessões</div></div>'
+        +   '<div><div class="analyst-stat-num">'+minToHM(totalMin)+'</div><div class="analyst-stat-lbl">Horas</div></div>'
+        + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /* ---- Tempo entre Comercial e Início da implantação ---- */
+  const prazoRows = cards.filter(c=>c.commercialDate && c.startDate).map(c=>({
+    c, client: byId(clients, c.clientId), days: daysBetweenISO(c.commercialDate, c.startDate)
+  }));
+  if(!prazoRows.length){
+    document.getElementById('prazo-kpis').innerHTML = '<div class="empty">Nenhum card com Data do Comercial e Início preenchidos.</div>';
+  } else {
+    const vals = prazoRows.map(r=>r.days).sort((a,b)=>a-b);
+    const avg = vals.reduce((x,y)=>x+y,0)/vals.length;
+    const mid = vals.length%2 ? vals[(vals.length-1)/2] : (vals[vals.length/2-1]+vals[vals.length/2])/2;
+    const minR = prazoRows.reduce((m,r)=> r.days<m.days?r:m, prazoRows[0]);
+    const maxR = prazoRows.reduce((m,r)=> r.days>m.days?r:m, prazoRows[0]);
+    const nm = r=> r.client ? r.client.name : '—';
+    document.getElementById('prazo-kpis').innerHTML = '<div class="prazo-kpis">'
+      + prazoKpi('⏱','Média', fmtDias(avg), 'em '+prazoRows.length+' card(s)')
+      + prazoKpi('◎','Mediana', fmtDias(mid), 'metade dos casos abaixo disso')
+      + prazoKpi('⚡','Mais rápido', fmtDias(minR.days), nm(minR))
+      + prazoKpi('🐢','Mais demorado', fmtDias(maxR.days), nm(maxR))
+      + '</div>';
+  }
+}
+
+function renderAgendaDoDia(state, H, today, clients, analysts){
+  document.getElementById('agenda-date').textContent = fmtDateBR(today);
+  const all = state.schedules.filter(s=> s.status!=='nao_realizada' && H.scheduleSpansDate(s, today));
+  const allDayScheds = all.filter(s=>s.allDay);
+  const timedScheds = all.filter(s=>!s.allDay);
+
+  // Eventos de dia inteiro (ex: Férias) — faixa no topo, fora da grade de horas
+  const alldayEl = document.getElementById('agenda-allday');
+  if(!allDayScheds.length){ alldayEl.innerHTML = ''; }
+  else {
+    alldayEl.innerHTML = allDayScheds.map(s=>{
+      const analyst = byId(analysts, H.scheduleAnalystIds(s)[0]);
+      const color = analyst ? (analyst.inactive?'#B9CAD5':analyst.color) : 'var(--ink-faint)';
+      const client = s.clientId ? byId(clients, s.clientId) : null;
+      return '<div class="agenda-allday-chip" style="background:'+color+';">'+esc(s.type||'Dia todo')+(client?' · '+esc(client.name):'')+'</div>';
+    }).join('');
+  }
+
+  const gridWrap = document.getElementById('cal-grid-wrap');
+  const gridEl = document.getElementById('cal-grid');
+  if(!timedScheds.length){
+    gridEl.innerHTML = '<div class="empty" style="margin:10px;">Nenhuma agenda com horário para hoje.</div>';
+    document.getElementById('agenda-legend').innerHTML = '';
+    return;
+  }
+
+  // Intervalo de horas a exibir: começa 1h antes do primeiro evento (mín. 7h),
+  // termina 1h depois do último (máx. 20h).
+  const starts = timedScheds.map(s=>timeToMin(s.startTime));
+  const ends = timedScheds.map(s=>Math.max(timeToMin(s.endTime), timeToMin(s.startTime)+15));
+  let startHour = Math.max(0, Math.min(7, Math.floor(Math.min(...starts)/60)));
+  let endHour = Math.max(20, Math.ceil(Math.max(...ends)/60));
+  startHour = Math.min(startHour, Math.floor(Math.min(...starts)/60));
+  endHour = Math.max(endHour, Math.ceil(Math.max(...ends)/60));
+
+  const pxPerHour = 44;
+  const pxPerMin = pxPerHour/60;
+  const gridHeight = (endHour-startHour)*pxPerHour;
+  gridEl.style.height = gridHeight+'px';
+
+  let html = '';
+  for(let h=startHour; h<=endHour; h++){
+    const top = (h-startHour)*pxPerHour;
+    html += '<div class="cal-hour-line" style="top:'+top+'px;"><span class="cal-hour-label" style="top:0;">'+String(h).padStart(2,'0')+':00</span></div>';
+  }
+
+  const laidOut = layoutDayEvents(timedScheds);
+  const usedAnalysts = new Set();
+  laidOut.forEach(item=>{
+    const s = item.sched;
+    const analystIds = H.scheduleAnalystIds(s);
+    const analyst = byId(analysts, analystIds[0]);
+    const color = analyst ? (analyst.inactive?'#B9CAD5':analyst.color) : '#8A9AAA';
+    if(analyst) usedAnalysts.add(analyst.id);
+    const textColor = readableTextColor(color);
+    const client = s.clientId ? byId(clients, s.clientId) : null;
+    const top = (item.start - startHour*60)*pxPerMin;
+    const height = Math.max((item.end-item.start)*pxPerMin, 18);
+    const widthPct = 100/item.lanes;
+    const leftPct = item.lane*widthPct;
+    html += '<div class="cal-event" style="top:'+top+'px;height:'+height+'px;left:calc(38px + ('+leftPct+'% * (100% - 38px)/100));width:calc('+widthPct+'% * (100% - 38px)/100 - 3px);background:'+color+';color:'+textColor+';" title="'+esc((s.startTime||'')+'–'+(s.endTime||'')+' · '+(client?client.name:s.type)+' · '+(analyst?analyst.name:''))+'">'
+      + '<div class="t">'+esc(s.startTime||'')+' '+esc(client?client.name:(s.type||''))+'</div>'
+      + (height>26 ? '<div class="c">'+esc(analyst?analyst.name:'')+'</div>' : '')
+      + '</div>';
+  });
+
+  // Linha do "agora", se hoje realmente for hoje e estiver dentro do intervalo mostrado
+  const now = new Date();
+  const nowMin = now.getHours()*60+now.getMinutes();
+  if(nowMin >= startHour*60 && nowMin <= endHour*60){
+    html += '<div class="cal-now-line" style="top:'+((nowMin-startHour*60)*pxPerMin)+'px;"></div>';
+  }
+
+  gridEl.innerHTML = html;
+
+  // Legenda de cores por analista (só os que têm algo hoje)
+  const legendItems = analysts.filter(a=>usedAnalysts.has(a.id));
+  document.getElementById('agenda-legend').innerHTML = legendItems.map(a=>
+    '<span><span class="dot" style="background:'+(a.inactive?'#B9CAD5':a.color)+';"></span>'+esc(a.name)+'</span>'
+  ).join('');
+
+  // Rola a grade até um pouco antes do primeiro evento do dia
+  setTimeout(()=>{ gridWrap.scrollTop = Math.max(0, (Math.min(...starts)-startHour*60)*pxPerMin - 30); }, 0);
 }
 
 function kpi(icon, label, value, warn){
@@ -224,6 +424,9 @@ function kpi(icon, label, value, warn){
 }
 function chartCard(icon, title, desc, bodyHtml){
   return '<div class="card"><h2>'+icon+' '+esc(title)+'</h2><p class="desc">'+esc(desc)+'</p><div class="card-body">'+bodyHtml+'</div></div>';
+}
+function prazoKpi(icon, label, value, sub){
+  return '<div class="prazo-kpi"><div class="prazo-kpi-label">'+icon+' '+esc(label)+'</div><div class="prazo-kpi-value">'+esc(value)+'</div><div class="prazo-kpi-sub">'+esc(sub)+'</div></div>';
 }
 
 async function loadAndRender(){
@@ -234,7 +437,7 @@ async function loadAndRender(){
     renderDashboard(data.data);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('error').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
+    document.getElementById('app').style.display = 'block';
     const upd = data.updated_at ? new Date(data.updated_at) : new Date();
     document.getElementById('updated-at').textContent = upd.toLocaleTimeString('pt-BR') + ' · atualiza a cada 1 min';
   } catch(err){
