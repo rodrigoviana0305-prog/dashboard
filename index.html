@@ -20,8 +20,9 @@
 
   .topbar{background:var(--brand-dark);color:#fff;padding:clamp(10px,1vw,18px) clamp(18px,1.8vw,34px);display:flex;align-items:center;gap:clamp(16px,1.6vw,30px);flex:0 0 auto;flex-wrap:wrap;}
   .topbar h1{margin:0;font-size:clamp(22px,2.1vw,34px);font-weight:800;letter-spacing:-.2px;white-space:nowrap;}
-  .topbar .updated{font-size:clamp(13px,1.05vw,18px);opacity:.8;margin-left:auto;white-space:nowrap;display:flex;align-items:center;gap:8px;}
-  .topbar .updated .pulse{width:10px;height:10px;border-radius:50%;background:#4ADE80;box-shadow:0 0 0 0 rgba(74,222,128,.7);animation:pulse 2s infinite;}
+  .topbar .updated{font-size:clamp(13px,1.05vw,18px);opacity:.85;margin-left:auto;white-space:nowrap;display:flex;align-items:center;gap:8px;font-weight:600;}
+  .topbar .updated .pulse{width:10px;height:10px;border-radius:50%;background:#4ADE80;box-shadow:0 0 0 0 rgba(74,222,128,.7);animation:pulse 2s infinite;flex:0 0 auto;}
+  .topbar .updated .age{opacity:.7;font-weight:500;}
   @keyframes pulse{
     0%   { box-shadow:0 0 0 0 rgba(74,222,128,.7); }
     70%  { box-shadow:0 0 0 10px rgba(74,222,128,0); }
@@ -604,6 +605,31 @@ function prazoKpi(icon, label, value, sub){
 }
 
 /* ============================================================
+   RENDER DO HORÁRIO — mostrado no topbar
+   - Mostra "Atualizado às HH:MM:SS · há Ns"
+   - "há Ns" é atualizado por um tick independente a cada 1s
+   ============================================================ */
+let lastRefreshAt = 0;
+
+function paintUpdatedAt(){
+  const el = document.getElementById('updated-at');
+  if(!el) return;
+  if(!lastRefreshAt){
+    el.innerHTML = '<span class="pulse"></span>Carregando…';
+    return;
+  }
+  const d = new Date(lastRefreshAt);
+  const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const seg = Math.max(0, Math.floor((Date.now() - lastRefreshAt) / 1000));
+  const ageTxt = seg < 2 ? 'agora' : ('há ' + seg + 's');
+  el.innerHTML = '<span class="pulse"></span>Atualizado às ' + hora
+               + ' <span class="age">· ' + ageTxt + '</span>';
+}
+
+/* Relógio independente: atualiza só o "há Ns" a cada 1 segundo */
+setInterval(paintUpdatedAt, 1000);
+
+/* ============================================================
    CARREGAMENTO
    ============================================================ */
 async function loadAndRender(){
@@ -617,21 +643,14 @@ async function loadAndRender(){
   document.getElementById('error').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 
-  const upd = data.updated_at ? new Date(data.updated_at) : new Date();
-  document.getElementById('updated-at').innerHTML =
-    '<span class="pulse"></span>' + upd.toLocaleTimeString('pt-BR') + ' · atualiza a cada 1 min';
+  lastRefreshAt = Date.now();
+  paintUpdatedAt();
 }
 
 /* ============================================================
    LOOP DE ATUALIZAÇÃO RESILIENTE
-   - setTimeout recursivo (não atropela se a rede estiver lenta)
-   - Reagenda mesmo se a query falhar
-   - Força refresh quando a aba/TV volta ao foco (visibilitychange/focus)
-   - Rede de segurança a cada 15s detecta timer travado
-   - Auto-reload após 30 min sem conseguir atualizar
    ============================================================ */
 let refreshTimer = null;
-let lastRefreshAt = 0;
 let refreshInFlight = false;
 let firstLoadDone = false;
 
@@ -641,19 +660,17 @@ async function refreshLoop(){
   const startedAt = Date.now();
   try{
     await loadAndRender();
-    lastRefreshAt = Date.now();
     firstLoadDone = true;
   } catch(err){
     console.error('[NEO] refresh falhou:', err);
-    // Se nunca conseguimos carregar, mostramos o erro na tela
     if(!firstLoadDone){
       document.getElementById('loading').style.display = 'none';
       const errEl = document.getElementById('error');
       errEl.style.display = 'flex';
       errEl.textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
+      lastRefreshAt = Date.now();  // evita reload prematuro
+      paintUpdatedAt();
     }
-    // Mesmo assim, marca o timestamp para o watchdog não disparar reload prematuro
-    lastRefreshAt = Date.now();
   } finally {
     refreshInFlight = false;
     const elapsed = Date.now() - startedAt;
@@ -663,7 +680,7 @@ async function refreshLoop(){
   }
 }
 
-/* Força refresh imediato quando a aba/TV volta a ficar visível */
+/* Refresh imediato ao voltar visibilidade */
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible'){
     const stale = Date.now() - lastRefreshAt > REFRESH_MS;
@@ -674,8 +691,7 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-/* Watchdog: se o timer travou (TV em standby, throttling agressivo),
-   detecta em até 15s e dispara refresh manual. */
+/* Watchdog: detecta timer travado em até 15s */
 setInterval(()=>{
   if(refreshInFlight) return;
   const stale = Date.now() - lastRefreshAt > REFRESH_MS * 2;
@@ -686,7 +702,7 @@ setInterval(()=>{
   }
 }, 15000);
 
-/* Volta do foco da janela (TV com controle remoto trocando de app) */
+/* Volta do foco da janela */
 window.addEventListener('focus', ()=>{
   const stale = Date.now() - lastRefreshAt > REFRESH_MS;
   if(stale && !refreshInFlight){
@@ -695,7 +711,7 @@ window.addEventListener('focus', ()=>{
   }
 });
 
-/* Recarrega a página inteira se ficar 30 min sem conseguir atualizar */
+/* Auto-reload após 30 min sem conseguir atualizar */
 setInterval(()=>{
   const deadFor = Date.now() - lastRefreshAt;
   if(deadFor > 30 * 60 * 1000){
