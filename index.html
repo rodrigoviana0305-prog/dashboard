@@ -2818,8 +2818,9 @@ function renderDashboardView(){
   }
   html += '</div>';
 
-  /* ---- Ranking de clientes por atendimento sem abatimento (antes de "Clientes por
-     segmento", conforme solicitado) ---- */
+  /* ---- Ranking de clientes por atendimento sem abatimento — renderizado no
+     FINAL do Painel Geral (seção de largura total), conforme solicitado.
+     Os dados são calculados aqui, mas o HTML só é anexado lá embaixo. ---- */
   const naoAbatidoByClientDash = {};
   state.schedules.forEach(s=>{
     if(s.status!=='concluida') return;
@@ -2836,35 +2837,35 @@ function renderDashboardView(){
     .filter(x=>x.mins>0)
     .sort((a,b)=>b.mins-a.mins)
     .slice(0,8);
-  html += '<div class="report-section dash-card">'
+  let rankingSemAbatimentoHtml = '<div class="report-section dash-card dash-card-full">'
     + '<div class="report-section-head"><div class="report-section-icon" style="background:var(--gold-soft);color:var(--gold);">⚑</div>'
     + '<div style="flex:1;"><h2 class="report-section-title">Ranking de atendimento sem abatimento</h2>'
     + '<p class="report-section-desc">Clientes com mais horas de atendimento interno concluído que não foram descontadas do saldo contratado (agendas internas sem card vinculado, ou com abatimento zerado de propósito).</p></div></div>';
   if(!naoAbatidoRanking.length){
-    html += '<div class="report-empty">Nenhum atendimento sem abatimento registrado com os filtros atuais.</div>';
+    rankingSemAbatimentoHtml += '<div class="report-empty">Nenhum atendimento sem abatimento registrado com os filtros atuais.</div>';
   } else {
     const maxNaoAbatidoMin = Math.max(1, ...naoAbatidoRanking.map(x=>x.mins));
-    html += '<div class="dash-barlist">';
+    rankingSemAbatimentoHtml += '<div class="dash-barlist">';
     naoAbatidoRanking.forEach(({client,mins})=>{
       const pct = Math.round((mins/maxNaoAbatidoMin)*100);
-      html += '<div class="dash-bar-row"><div class="dash-bar-label">'+esc(client.name)+'</div>'
+      rankingSemAbatimentoHtml += '<div class="dash-bar-row"><div class="dash-bar-label">'+esc(client.name)+'</div>'
         + '<div class="dash-bar-track"><div class="dash-bar-fill" style="width:'+pct+'%;background:var(--gold);"></div></div>'
         + '<div class="dash-bar-value">'+minToHM(mins)+'</div></div>';
     });
-    html += '</div>';
+    rankingSemAbatimentoHtml += '</div>';
   }
-  html += '</div>';
+  rankingSemAbatimentoHtml += '</div>';
 
-  /* ---- Distribuição de clientes por segmento (na grade 2 colunas) e por cidade
-     (seção de largura total, no final, pra fechar a grade sem espaço sobrando —
-     eram 5 itens ao todo, número ímpar; "Clientes por cidade" vai sozinha,
-     ocupando a largura toda, em vez de deixar um buraco na última linha) ---- */
+  /* ---- Distribuição de clientes por segmento e por cidade — de volta aos dois
+     na grade de 2 colunas (junto com Horas por tipo e Módulos mais treinados),
+     mantendo 4 itens ao todo (par, sem espaço sobrando) agora que o Ranking saiu
+     daqui pra virar a seção final. ---- */
   html += renderClientDistribution('Clientes por segmento', 'Distribuição da base de clientes conforme o segmento cadastrado. Este relatório não é filtrado por analista.', '🏷️', clientsBySegment);
+  html += renderClientDistribution('Clientes por cidade', 'Distribuição da base de clientes conforme a cidade cadastrada. Este relatório não é filtrado por analista.', '📍', clientsByCity);
 
-  html += '</div>'; // fecha a dash-grid de 2 colunas (agora com 4 itens, sem espaço sobrando)
+  html += '</div>'; // fecha a dash-grid de 2 colunas (4 itens, sem espaço sobrando)
 
-  html += renderClientDistribution('Clientes por cidade', 'Distribuição da base de clientes conforme a cidade cadastrada. Este relatório não é filtrado por analista.', '📍', clientsByCity)
-    .replace('report-section dash-card client-distribution-card', 'report-section dash-card dash-card-full client-distribution-card');
+  html += rankingSemAbatimentoHtml; // seção de largura total, no final do Painel Geral
 
   return html;
 }
