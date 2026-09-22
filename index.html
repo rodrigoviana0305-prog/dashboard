@@ -69,6 +69,32 @@
   .neg{color:var(--danger);} .pos{color:var(--ok);}
   .dot{width:clamp(10px,.85vw,14px);height:clamp(10px,.85vw,14px);border-radius:50%;flex:0 0 auto;}
 
+  /* ============ LISTA DE SALDO (sem barra) ============ */
+  .bal-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:clamp(8px,.8vw,14px);
+    padding:clamp(5px,.55vw,10px) 0;
+    border-bottom:1px solid var(--border);
+    font-size:clamp(15px,1.3vw,22px);
+  }
+  .bal-row:last-child{ border-bottom:none; }
+  .bal-label{
+    font-weight:700;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-width:0;
+    flex:1 1 auto;
+  }
+  .bal-value{
+    font-weight:800;
+    white-space:nowrap;
+    flex:0 0 auto;
+    font-size:clamp(14px,1.25vw,21px);
+  }
+
   /* ============ PROJETOS ============ */
   .proj-row{padding:clamp(6px,.65vw,12px) 0;border-bottom:1px solid var(--border);}
   .proj-row:last-child{border-bottom:none;}
@@ -248,6 +274,18 @@ function barList(items, colorFn){
   }).join('');
 }
 
+/* Lista sem barra — usada no card de "Horas disponíveis".
+   O nome ocupa todo o espaço e o valor fica alinhado à direita. */
+function balanceList(items){
+  if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
+  return items.map(i=>
+    '<div class="bal-row">'
+    + '<div class="bal-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
+    + '<div class="bal-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div>'
+    + '</div>'
+  ).join('');
+}
+
 function projectList(items){
   if(!items.length) return '<div class="empty">Nenhum projeto em andamento.</div>';
   return items.map(p=>{
@@ -404,8 +442,8 @@ function renderDashboard(state){
     .filter(r=> r.client && Math.abs(r.bal) > 0.0001)
     .sort((a,b)=> a.bal - b.bal)
     .map(r=>({label:r.client.name, value:Math.abs(r.bal), display:minToHM(r.bal*60), valueClass:r.bal<0?'neg':'pos'}));
-  const balBody = barList(balRows, i=>i.valueClass==='neg'?'var(--danger)':'var(--ok)');
-  sideHtml += chartCardCarousel('💰','Horas disponíveis dos clientes','Todos os clientes com saldo ≠ 0', 'carousel-bal', balBody);
+  const balBody = balanceList(balRows);
+  sideHtml += chartCardCarousel('💰','Horas disponíveis','Clientes com saldo ≠ 0', 'carousel-bal', balBody);
 
   const perfAnalysts = analysts.filter(a=> !EXCLUDE_ANALYST_NAMES.some(n=> (a.name||'').trim().toLowerCase().includes(n)));
   let analystHtml;
@@ -606,8 +644,6 @@ function prazoKpi(icon, label, value, sub){
 
 /* ============================================================
    RENDER DO HORÁRIO — mostrado no topbar
-   - Mostra "Atualizado às HH:MM:SS · há Ns"
-   - "há Ns" é atualizado por um tick independente a cada 1s
    ============================================================ */
 let lastRefreshAt = 0;
 
@@ -626,7 +662,6 @@ function paintUpdatedAt(){
                + ' <span class="age">· ' + ageTxt + '</span>';
 }
 
-/* Relógio independente: atualiza só o "há Ns" a cada 1 segundo */
 setInterval(paintUpdatedAt, 1000);
 
 /* ============================================================
@@ -668,7 +703,7 @@ async function refreshLoop(){
       const errEl = document.getElementById('error');
       errEl.style.display = 'flex';
       errEl.textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
-      lastRefreshAt = Date.now();  // evita reload prematuro
+      lastRefreshAt = Date.now();
       paintUpdatedAt();
     }
   } finally {
@@ -680,7 +715,6 @@ async function refreshLoop(){
   }
 }
 
-/* Refresh imediato ao voltar visibilidade */
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible'){
     const stale = Date.now() - lastRefreshAt > REFRESH_MS;
@@ -691,7 +725,6 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-/* Watchdog: detecta timer travado em até 15s */
 setInterval(()=>{
   if(refreshInFlight) return;
   const stale = Date.now() - lastRefreshAt > REFRESH_MS * 2;
@@ -702,7 +735,6 @@ setInterval(()=>{
   }
 }, 15000);
 
-/* Volta do foco da janela */
 window.addEventListener('focus', ()=>{
   const stale = Date.now() - lastRefreshAt > REFRESH_MS;
   if(stale && !refreshInFlight){
@@ -711,7 +743,6 @@ window.addEventListener('focus', ()=>{
   }
 });
 
-/* Auto-reload após 30 min sem conseguir atualizar */
 setInterval(()=>{
   const deadFor = Date.now() - lastRefreshAt;
   if(deadFor > 30 * 60 * 1000){
@@ -720,7 +751,6 @@ setInterval(()=>{
   }
 }, 60000);
 
-/* Boot inicial */
 refreshLoop();
 </script>
 </body>
