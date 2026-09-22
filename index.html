@@ -69,6 +69,32 @@
   .neg{color:var(--danger);} .pos{color:var(--ok);}
   .dot{width:clamp(10px,.85vw,14px);height:clamp(10px,.85vw,14px);border-radius:50%;flex:0 0 auto;}
 
+  /* ============ LISTA DE SALDO (sem barra) ============ */
+  .bal-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:clamp(8px,.8vw,14px);
+    padding:clamp(5px,.55vw,10px) 0;
+    border-bottom:1px solid var(--border);
+    font-size:clamp(15px,1.3vw,22px);
+  }
+  .bal-row:last-child{ border-bottom:none; }
+  .bal-label{
+    font-weight:700;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-width:0;
+    flex:1 1 auto;
+  }
+  .bal-value{
+    font-weight:800;
+    white-space:nowrap;
+    flex:0 0 auto;
+    font-size:clamp(14px,1.25vw,21px);
+  }
+
   /* ============ PROJETOS ============ */
   .proj-row{padding:clamp(6px,.65vw,12px) 0;border-bottom:1px solid var(--border);}
   .proj-row:last-child{border-bottom:none;}
@@ -269,6 +295,18 @@ function barList(items, colorFn){
   }).join('');
 }
 
+/* Lista sem barra — usada no card "Horas disponíveis".
+   O nome ocupa todo o espaço e o valor fica alinhado à direita. */
+function balanceList(items){
+  if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
+  return items.map(i=>
+    '<div class="bal-row">'
+    + '<div class="bal-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
+    + '<div class="bal-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div>'
+    + '</div>'
+  ).join('');
+}
+
 /* Chips dos produtos contratados (usado em "Projetos em andamento") */
 function productChipsHtml(productTags, productTagIds){
   if(!productTagIds || !productTagIds.length) return '';
@@ -442,8 +480,8 @@ function renderDashboard(state){
     .filter(r=> r.client && Math.abs(r.bal) > 0.0001)
     .sort((a,b)=> a.bal - b.bal)
     .map(r=>({label:r.client.name, value:Math.abs(r.bal), display:minToHM(r.bal*60), valueClass:r.bal<0?'neg':'pos'}));
-  const balBody = barList(balRows, i=>i.valueClass==='neg'?'var(--danger)':'var(--ok)');
-  sideHtml += chartCardCarousel('💰','Horas disponíveis dos clientes','Todos os clientes com saldo ≠ 0', 'carousel-bal', balBody);
+  const balBody = balanceList(balRows);
+  sideHtml += chartCardCarousel('💰','Horas disponíveis','Clientes com saldo ≠ 0', 'carousel-bal', balBody);
 
   const perfAnalysts = analysts.filter(a=> !EXCLUDE_ANALYST_NAMES.some(n=> (a.name||'').trim().toLowerCase().includes(n)));
   let analystHtml;
