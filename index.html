@@ -11,64 +11,85 @@
     --border:#DCE5EB; --ink:#17324D; --ink-soft:#627486; --ink-faint:#8A9AAA;
     --brand:#0B5C8E; --brand-dark:#073F63; --brand-soft:#E5F1F8;
     --gold:#F0A72F; --gold-soft:#FFF1D8; --danger:#C94B42; --danger-soft:#FCE7E5;
-    --ok:#169B67; --ok-soft:#E2F5ED;
+    --ok:#169B67; --ok-soft:#E2F5ED; --purple:#7B4B94;
     --shadow-1:0 2px 8px rgba(23,50,77,.06),0 1px 2px rgba(23,50,77,.04);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;}
-  .topbar{background:var(--brand-dark);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
-  .topbar h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.2px;}
-  .topbar .updated{font-size:12px;opacity:.85;}
-  .wrap{max-width:1400px;margin:0 auto;padding:22px;}
-  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
-  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-1);}
-  .kpi-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);}
-  .kpi-value{font-size:26px;font-weight:800;color:var(--brand-dark);margin:4px 0 2px;}
-  .kpi-sub{font-size:12px;color:var(--ink-soft);}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-  .card-full{grid-column:1 / -1;}
-  .section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-1);min-width:0;}
-  .section h2{font-size:15px;margin:0 0 3px;color:var(--brand-dark);}
-  .section p.desc{font-size:12px;color:var(--ink-faint);margin:0 0 14px;}
-  .empty{padding:24px;text-align:center;color:var(--ink-faint);font-size:13px;background:var(--surface-2);border-radius:10px;border:1px dashed var(--border);}
-  table{width:100%;border-collapse:collapse;}
-  th{text-align:left;padding:9px 10px;background:var(--surface-2);color:var(--ink-soft);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;}
-  td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;}
-  .bar-row{display:grid;grid-template-columns:130px 1fr 70px;align-items:center;gap:9px;font-size:12.5px;margin-bottom:10px;}
+  html,body{height:100%;margin:0;overflow:hidden;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:13px;display:flex;flex-direction:column;}
+
+  .topbar{background:var(--brand-dark);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:18px;flex:0 0 auto;flex-wrap:wrap;}
+  .topbar h1{margin:0;font-size:15px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;}
+  .topbar .updated{font-size:10.5px;opacity:.75;margin-left:auto;white-space:nowrap;}
+  .kpis{display:flex;gap:10px;flex:1;flex-wrap:wrap;}
+  .kpi{background:rgba(255,255,255,.08);border-radius:10px;padding:6px 14px;min-width:150px;flex:1 1 150px;}
+  .kpi-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;opacity:.75;}
+  .kpi-value{font-size:19px;font-weight:800;line-height:1.25;}
+
+  .main{flex:1;display:flex;gap:10px;padding:10px;min-height:0;}
+  .charts-area{flex:1 1 72%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;min-height:0;min-width:0;}
+  .agenda-panel{flex:0 0 26%;max-width:340px;min-width:230px;display:flex;flex-direction:column;min-height:0;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-1);
+        display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:10px 14px;}
+  .card h2{font-size:12.5px;margin:0 0 2px;color:var(--brand-dark);display:flex;align-items:center;gap:5px;}
+  .card p.desc{font-size:10px;color:var(--ink-faint);margin:0 0 8px;}
+  .card-body{flex:1;min-height:0;overflow-y:auto;}
+
+  .empty{padding:14px;text-align:center;color:var(--ink-faint);font-size:11.5px;background:var(--surface-2);border-radius:8px;border:1px dashed var(--border);}
+
+  .bar-row{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:7px;font-size:11px;margin-bottom:6px;}
   .bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .bar-track{background:var(--surface-2);border-radius:999px;height:10px;overflow:hidden;}
+  .bar-track{background:var(--surface-2);border-radius:999px;height:8px;overflow:hidden;}
   .bar-fill{height:100%;border-radius:999px;background:var(--brand);}
-  .bar-value{text-align:right;font-weight:800;white-space:nowrap;}
-  .badge{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .bar-value{text-align:right;font-weight:800;white-space:nowrap;font-size:10.5px;}
   .neg{color:var(--danger);} .pos{color:var(--ok);}
-  #loading, #error{padding:60px 20px;text-align:center;color:var(--ink-soft);}
+
+  .agenda-item{border-left:3px solid var(--brand);background:var(--surface-2);border-radius:0 8px 8px 0;padding:6px 9px;margin-bottom:7px;}
+  .agenda-item.done{border-left-color:var(--ok);opacity:.75;}
+  .agenda-time{font-size:10px;font-weight:800;color:var(--brand-dark);}
+  .agenda-client{font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agenda-meta{font-size:9.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  #loading, #error{flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);}
   #error{color:var(--danger);display:none;}
-  @media screen and (max-width:820px){ .grid{grid-template-columns:1fr;} .bar-row{grid-template-columns:96px 1fr 60px;} }
+
+  @media screen and (max-width:900px){
+    html,body{overflow:auto;}
+    .main{flex-direction:column;}
+    .charts-area{grid-template-columns:1fr;grid-template-rows:none;}
+    .agenda-panel{max-width:none;}
+  }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <h1>🗂️ NEO — Painel de Implantação</h1>
+  <h1>🗂️ NEO</h1>
+  <div class="kpis" id="kpis"></div>
   <span class="updated" id="updated-at">Carregando…</span>
 </div>
 
 <div id="loading">Carregando dados…</div>
 <div id="error"></div>
-<div class="wrap" id="app" style="display:none;"></div>
+<div class="main" id="app" style="display:none;">
+  <div class="charts-area" id="charts-area"></div>
+  <div class="agenda-panel">
+    <div class="card" style="flex:1;">
+      <h2>📅 Agenda do dia</h2>
+      <p class="desc" id="agenda-date"></p>
+      <div class="card-body" id="agenda-list"></div>
+    </div>
+  </div>
+</div>
 
 <script>
-/* =========================================================================
-   CONFIGURAÇÃO — mesmo projeto Supabase que o Implanta já usa.
-   Este dashboard é SOMENTE LEITURA: nunca escreve na tabela app_state.
-   ========================================================================= */
 const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
-const REFRESH_MS = 60000; // atualiza sozinho a cada 60s
+const REFRESH_MS = 60000;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ---- Helpers de data/hora (mesma lógica do Implanta) ---- */
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function currentMonthRange(){
   const d = new Date();
@@ -79,7 +100,6 @@ function currentMonthRange(){
 }
 function dateInRange(iso, range){ return iso >= range.start && iso <= range.end; }
 function timeToMin(t){ if(!t) return 0; const [h,m] = t.split(':').map(Number); return h*60+m; }
-function isWeekdayISO(iso){ const d = new Date(iso+'T00:00:00'); const wd = d.getDay(); return wd!==0 && wd!==6; }
 function countWeekdaysBetweenISO(startIso, endIso){
   let count = 0; let cur = new Date(startIso+'T00:00:00'); const end = new Date(endIso+'T00:00:00');
   while(cur <= end){ if(cur.getDay()!==0 && cur.getDay()!==6) count++; cur.setDate(cur.getDate()+1); }
@@ -91,17 +111,17 @@ function minToHM(min){
   return sign + (m ? h+'h'+String(m).padStart(2,'0') : h+'h');
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDateBR(iso){ const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
 
-/* ---- Lógica de negócio replicada do Implanta (mesmas regras) ---- */
 const FERIAS_TYPE_NAME = 'Férias';
 const FERIAS_MIN_PER_WEEKDAY = 8*60+48;
 
 function buildHelpers(state){
   function isFeriasType(name){ return !!(name && name.toLowerCase()===FERIAS_TYPE_NAME.toLowerCase()); }
   function isInternalType(name){ const t=(state.agendaTypes||[]).find(t=>t.name===name); return !!(t && t.isInternal); }
-  function isServicoType(name){ const t=(state.agendaTypes||[]).find(t=>t.name===name); return !!(t && t.isServico); }
   function scheduleAnalystIds(s){ return s.analystIds && s.analystIds.length ? s.analystIds : (s.analystId?[s.analystId]:[]); }
   function scheduleDayCount(s){ if(!s.allDay) return 1; const a=new Date(s.date+'T00:00:00'), b=new Date((s.endDate||s.date)+'T00:00:00'); return Math.round((b-a)/86400000)+1; }
+  function scheduleSpansDate(s, dateISO){ if(!s.allDay) return s.date===dateISO; const endD = s.endDate || s.date; return dateISO>=s.date && dateISO<=endD; }
   function scheduleMinutesPerAnalyst(s){
     if(s.allDay){
       if(isFeriasType(s.type)) return countWeekdaysBetweenISO(s.date, s.endDate||s.date) * FERIAS_MIN_PER_WEEKDAY;
@@ -115,12 +135,21 @@ function buildHelpers(state){
       .reduce((sum,s)=> sum + (s.deductMinutes!=null ? s.deductMinutes : scheduleActualMinutes(s)), 0);
   }
   function cardBalanceHours(card){ if(card.balanceForfeited) return 0; return (card.contractedHours||0) - cardUsedMinutes(card)/60; }
-  return { isFeriasType, isInternalType, isServicoType, scheduleAnalystIds, scheduleMinutesPerAnalyst, scheduleActualMinutes, cardUsedMinutes, cardBalanceHours };
+  return { isFeriasType, isInternalType, scheduleAnalystIds, scheduleSpansDate, scheduleMinutesPerAnalyst, scheduleActualMinutes, cardUsedMinutes, cardBalanceHours };
 }
 
 function byId(arr, id){ return (arr||[]).find(x=>x.id===id); }
+function barList(items, colorFn){
+  if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
+  const max = Math.max(1, ...items.map(i=>i.value));
+  return items.map(i=>{
+    const pct = Math.round((i.value/max)*100);
+    return '<div class="bar-row"><div class="bar-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(colorFn?colorFn(i):'var(--brand)')+';"></div></div>'
+      + '<div class="bar-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div></div>';
+  }).join('');
+}
 
-/* ---- Renderização ---- */
 function renderDashboard(state){
   const H = buildHelpers(state);
   const clients = state.clients||[], analysts = state.analysts||[], boards = state.boards||[],
@@ -130,97 +159,73 @@ function renderDashboard(state){
   const today = todayISO();
 
   const totalBalance = cards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
-  const pendConf = schedules.filter(s=> s.status==='pendente' && !s.allDay && s.date <= today).length;
+  const naoAbatidoByClient = {};
+  schedules.forEach(s=>{
+    if(s.status!=='concluida' || !H.isInternalType(s.type) || !s.clientId) return;
+    const isUnlinked = !s.cardId, isZeroed = s.cardId && s.deductMinutes===0;
+    if(!isUnlinked && !isZeroed) return;
+    naoAbatidoByClient[s.clientId] = (naoAbatidoByClient[s.clientId]||0) + H.scheduleActualMinutes(s);
+  });
+  const totalNaoAbatido = Object.values(naoAbatidoByClient).reduce((s,v)=>s+v,0);
 
-  let html = '<div class="kpi-grid">';
-  html += kpi('📁','Projetos em andamento', activeCards.length, clients.length+' cliente(s) cadastrado(s)');
-  html += kpi('👤','Analistas ativos', analysts.filter(a=>!a.inactive).length, analysts.length+' no total');
-  html += kpi('⏳','Saldo total disponível', minToHM(totalBalance*60), totalBalance<0?'atenção: saldo negativo':'dentro do contratado', totalBalance<0);
-  html += kpi('🔔','Confirmações pendentes', pendConf, pendConf?'requer atenção':'tudo em dia', pendConf>0);
-  html += '</div><div class="grid">';
+  document.getElementById('kpis').innerHTML =
+      kpi('📁','Projetos em andamento', activeCards.length)
+    + kpi('⏳','Saldo total disponível', minToHM(totalBalance*60), totalBalance<0)
+    + kpi('⚑','Horas sem abatimento', minToHM(totalNaoAbatido));
 
-  /* Projetos em andamento */
-  html += '<div class="section card-full"><h2>📁 Projetos em andamento</h2><p class="desc">Cards ainda não concluídos, ordenados por uso do saldo contratado.</p>';
-  if(!activeCards.length){ html += '<div class="empty">Nenhum projeto em andamento no momento.</div>'; }
-  else {
-    const rows = activeCards.map(c=>{
-      const client = byId(clients, c.clientId);
-      const board = byId(boards, c.boardId);
-      const analyst = board ? byId(analysts, board.analystId) : null;
-      const used = H.cardUsedMinutes(c)/60;
-      const pct = c.contractedHours ? Math.min(100, Math.max(0,(used/c.contractedHours)*100)) : 0;
-      const bal = H.cardBalanceHours(c);
-      return {client, analyst, pct, bal};
-    }).sort((a,b)=> b.pct-a.pct).slice(0,10);
-    html += '<table><thead><tr><th>Cliente</th><th>Analista</th><th>Progresso</th><th>Saldo</th></tr></thead><tbody>';
-    rows.forEach(r=>{
-      html += '<tr><td><strong>'+esc(r.client?r.client.name:'—')+'</strong></td><td>'+esc(r.analyst?r.analyst.name:'—')+'</td>'
-        + '<td><div class="bar-track" style="max-width:160px;"><div class="bar-fill" style="width:'+r.pct+'%;background:'+(r.pct>=90?'var(--danger)':r.pct>=70?'var(--gold)':'var(--brand)')+';"></div></div></td>'
-        + '<td class="'+(r.bal<0?'neg':'pos')+'" style="font-weight:800;">'+minToHM(r.bal*60)+'</td></tr>';
-    });
-    html += '</tbody></table>';
+  const todaySchedules = schedules.filter(s=> s.status!=='nao_realizada' && H.scheduleSpansDate(s, today))
+    .sort((a,b)=> (a.allDay?'':a.startTime||'').localeCompare(b.allDay?'':b.startTime||''));
+  document.getElementById('agenda-date').textContent = fmtDateBR(today);
+  if(!todaySchedules.length){
+    document.getElementById('agenda-list').innerHTML = '<div class="empty">Nenhuma agenda para hoje.</div>';
+  } else {
+    document.getElementById('agenda-list').innerHTML = todaySchedules.map(s=>{
+      const client = s.clientId ? byId(clients, s.clientId) : null;
+      const analystNames = H.scheduleAnalystIds(s).map(id=>{ const a=byId(analysts,id); return a?a.name:'—'; }).join(', ');
+      const timeText = s.allDay ? 'Dia todo' : (s.startTime||'')+(s.endTime?'–'+s.endTime:'');
+      const cls = s.status==='concluida' ? 'done' : '';
+      return '<div class="agenda-item '+cls+'"><div class="agenda-time">'+esc(timeText)+' · '+esc(s.type||'')+'</div>'
+        + '<div class="agenda-client">'+esc(client?client.name:'(sem cliente)')+'</div>'
+        + '<div class="agenda-meta">'+esc(analystNames||'—')+'</div></div>';
+    }).join('');
   }
-  html += '</div>';
 
-  /* Tempo de trabalho dos analistas (mes atual) */
-  html += '<div class="section"><h2>⏱ Tempo de trabalho dos analistas</h2><p class="desc">Horas em agendas concluídas neste mês.</p>';
-  if(!analysts.length){ html += '<div class="empty">Nenhum analista cadastrado.</div>'; }
-  else {
-    const analystMin = analysts.map(a=>{
-      const mins = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange))
-        .reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
-      return {a, mins};
-    }).sort((x,y)=>y.mins-x.mins);
-    const maxMin = Math.max(1, ...analystMin.map(x=>x.mins));
-    analystMin.forEach(({a,mins})=>{
-      const pct = Math.round((mins/maxMin)*100);
-      html += '<div class="bar-row"><div class="bar-label">'+esc(a.name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(a.inactive?'#B9CAD5':'var(--brand)')+';"></div></div><div class="bar-value">'+minToHM(mins)+'</div></div>';
-    });
-  }
-  html += '</div>';
+  let chartsHtml = '';
 
-  /* Horas do mes por tipo de agenda */
-  html += '<div class="section"><h2>🗓 Horas do mês por tipo de agenda</h2><p class="desc">Agendas concluídas neste mês, somadas por tipo.</p>';
-  const monthScheds = schedules.filter(s=>s.status==='concluida' && dateInRange(s.date, monthRange));
-  if(!monthScheds.length){ html += '<div class="empty">Nenhuma agenda concluída neste mês ainda.</div>'; }
-  else {
-    const byType = {};
-    monthScheds.forEach(s=>{ const n=Math.max(1,H.scheduleAnalystIds(s).length); byType[s.type] = (byType[s.type]||0) + H.scheduleMinutesPerAnalyst(s)*n; });
-    const entries = Object.entries(byType).sort((a,b)=>b[1]-a[1]);
-    const maxMin = Math.max(1, ...entries.map(e=>e[1]));
-    entries.forEach(([typeName,mins])=>{
-      const pct = Math.round((mins/maxMin)*100);
-      html += '<div class="bar-row"><div class="bar-label">'+esc(typeName)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;"></div></div><div class="bar-value">'+minToHM(mins)+'</div></div>';
-    });
-  }
-  html += '</div>';
+  const analystItems = analysts.map(a=>{
+    const mins = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange))
+      .reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
+    return {label:a.name, value:mins, display:minToHM(mins), inactive:a.inactive};
+  }).sort((x,y)=>y.value-x.value).slice(0,6);
+  chartsHtml += chartCard('⏱','Horas dos analistas','Concluídas neste mês', barList(analystItems, i=>i.inactive?'#B9CAD5':'var(--brand)'));
 
-  /* Modulos mais treinados */
-  html += '<div class="section card-full"><h2>🎓 Módulos mais treinados</h2><p class="desc">Ranking geral, considerando todas as agendas concluídas.</p>';
-  const moduleCounts = {};
-  schedules.filter(s=>s.status==='concluida').forEach(s=> (s.modules||[]).forEach(m=> moduleCounts[m]=(moduleCounts[m]||0)+1));
-  const modEntries = Object.entries(moduleCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  if(!modEntries.length){ html += '<div class="empty">Nenhum módulo treinado registrado ainda.</div>'; }
-  else {
-    const maxCount = Math.max(1, ...modEntries.map(e=>e[1]));
-    modEntries.forEach(([name,count])=>{
-      const pct = Math.round((count/maxCount)*100);
-      html += '<div class="bar-row"><div class="bar-label">'+esc(name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--gold);"></div></div><div class="bar-value">'+count+'x</div></div>';
-    });
-  }
-  html += '</div>';
+  const balRows = activeCards.map(c=>({client:byId(clients,c.clientId), bal:H.cardBalanceHours(c)}))
+    .filter(r=>r.client).sort((a,b)=>a.bal-b.bal).slice(0,6)
+    .map(r=>({label:r.client.name, value:Math.abs(r.bal), display:minToHM(r.bal*60), valueClass:r.bal<0?'neg':'pos'}));
+  chartsHtml += chartCard('💰','Horas disponíveis dos clientes','Projetos ativos, menor saldo primeiro', barList(balRows, i=>i.valueClass==='neg'?'var(--danger)':'var(--ok)'));
 
-  html += '</div>';
-  document.getElementById('app').innerHTML = html;
+  const byType = {};
+  schedules.filter(s=>s.status==='concluida' && dateInRange(s.date, monthRange)).forEach(s=>{
+    byType[s.type] = (byType[s.type]||0) + H.scheduleActualMinutes(s);
+  });
+  const typeItems = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,mins])=>({label:name, value:mins, display:minToHM(mins)}));
+  chartsHtml += chartCard('🗓','Horas por tipo de agenda','Concluídas neste mês', barList(typeItems, ()=>'var(--gold)'));
+
+  const naoAbatidoItems = Object.entries(naoAbatidoByClient).sort((a,b)=>b[1]-a[1]).slice(0,6)
+    .map(([clientId,mins])=>{ const cl=byId(clients,clientId); return {label:cl?cl.name:'—', value:mins, display:minToHM(mins)}; });
+  chartsHtml += chartCard('⚑','Ranking sem abatimento','Horas internas não descontadas do saldo', barList(naoAbatidoItems, ()=>'var(--purple)'));
+
+  document.getElementById('charts-area').innerHTML = chartsHtml;
 }
 
-function kpi(icon, label, value, sub, warn){
-  return '<div class="kpi-card"><div class="kpi-label">'+icon+' '+esc(label)+'</div>'
-    + '<div class="kpi-value">'+esc(value)+'</div>'
-    + '<div class="kpi-sub" style="color:'+(warn?'var(--danger)':'var(--ink-soft)')+';">'+esc(sub)+'</div></div>';
+function kpi(icon, label, value, warn){
+  return '<div class="kpi"><div class="kpi-label">'+icon+' '+esc(label)+'</div>'
+    + '<div class="kpi-value" style="color:'+(warn?'#FFB4A8':'#fff')+';">'+esc(value)+'</div></div>';
+}
+function chartCard(icon, title, desc, bodyHtml){
+  return '<div class="card"><h2>'+icon+' '+esc(title)+'</h2><p class="desc">'+esc(desc)+'</p><div class="card-body">'+bodyHtml+'</div></div>';
 }
 
-/* ---- Busca dos dados e ciclo de atualização ---- */
 async function loadAndRender(){
   try{
     const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
@@ -229,13 +234,13 @@ async function loadAndRender(){
     renderDashboard(data.data);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('error').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+    document.getElementById('app').style.display = 'flex';
     const upd = data.updated_at ? new Date(data.updated_at) : new Date();
-    document.getElementById('updated-at').textContent = 'Dados de ' + upd.toLocaleString('pt-BR') + ' · atualiza sozinho a cada 1 min';
+    document.getElementById('updated-at').textContent = upd.toLocaleTimeString('pt-BR') + ' · atualiza a cada 1 min';
   } catch(err){
     console.error(err);
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').style.display = 'flex';
     document.getElementById('error').textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
   }
 }
