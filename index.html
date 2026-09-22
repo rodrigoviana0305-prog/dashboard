@@ -52,6 +52,15 @@
   .neg{color:var(--danger);} .pos{color:var(--ok);}
   .dot{width:clamp(8px,.7vw,12px);height:clamp(8px,.7vw,12px);border-radius:50%;flex:0 0 auto;}
 
+  .proj-row{padding:clamp(4px,.5vw,7px) 0;border-bottom:1px solid var(--border);}
+  .proj-row:last-child{border-bottom:none;}
+  .proj-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:clamp(13px,1.1vw,18px);margin-bottom:3px;}
+  .proj-client{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .proj-bal{font-weight:800;white-space:nowrap;font-size:clamp(12px,1.05vw,17px);}
+  .proj-bottom{display:flex;align-items:center;gap:8px;}
+  .proj-bottom .bar-track{height:clamp(7px,.65vw,11px);}
+  .proj-analyst{font-size:clamp(10.5px,.9vw,14px);color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;}
+
   .agenda-allday{display:flex;flex-direction:column;gap:4px;margin-bottom:6px;flex:0 0 auto;}
   .agenda-allday-chip{font-size:clamp(12px,1vw,16px);font-weight:700;padding:3px 9px;border-radius:6px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .cal-grid-wrap{position:relative;flex:1;min-height:0;overflow-y:auto;border-top:1px solid var(--border);}
@@ -66,14 +75,15 @@
   .agenda-legend{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px;font-size:clamp(11px,.9vw,15px);color:var(--ink-soft);flex:0 0 auto;}
   .agenda-legend span{display:inline-flex;align-items:center;gap:4px;}
 
-  .analyst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:clamp(6px,.6vw,12px);}
-  .analyst-card{border:1px solid var(--border);border-radius:9px;padding:clamp(7px,.7vw,12px) clamp(9px,.9vw,14px);border-left:4px solid var(--brand);background:var(--surface-2);}
-  .analyst-card-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+  .analyst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:clamp(6px,.6vw,12px);}
+  .analyst-card{border:1px solid var(--border);border-radius:9px;padding:clamp(7px,.7vw,12px) clamp(9px,.9vw,14px);border-left:4px solid var(--brand);background:var(--surface-2);min-width:0;overflow:hidden;}
+  .analyst-card-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0;}
   .analyst-avatar{width:clamp(22px,2vw,32px);height:clamp(22px,2vw,32px);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:clamp(11px,1vw,15px);flex:0 0 auto;}
-  .analyst-name{font-weight:700;font-size:clamp(13px,1.1vw,18px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .analyst-stats{display:flex;gap:clamp(8px,.9vw,16px);}
-  .analyst-stat-num{font-size:clamp(15px,1.35vw,21px);font-weight:800;color:var(--brand-dark);}
-  .analyst-stat-lbl{font-size:clamp(9px,.75vw,12px);color:var(--ink-faint);text-transform:uppercase;}
+  .analyst-name{font-weight:700;font-size:clamp(13px,1.1vw,18px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+  .analyst-stats{display:flex;gap:clamp(6px,.7vw,14px);min-width:0;}
+  .analyst-stats > div{min-width:0;overflow:hidden;}
+  .analyst-stat-num{font-size:clamp(15px,1.35vw,21px);font-weight:800;color:var(--brand-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .analyst-stat-lbl{font-size:clamp(9px,.75vw,12px);color:var(--ink-faint);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
   .prazo-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(6px,.6vw,12px);height:100%;}
   .prazo-kpi{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:clamp(7px,.7vw,12px) clamp(10px,1vw,16px);display:flex;flex-direction:column;justify-content:center;min-width:0;}
@@ -209,6 +219,19 @@ function barList(items, colorFn){
       + '<div class="bar-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div></div>';
   }).join('');
 }
+function projectList(items){
+  if(!items.length) return '<div class="empty">Nenhum projeto em andamento.</div>';
+  return items.map(p=>{
+    const barClass = p.pct>=90?'danger':(p.pct>=70?'gold':'brand');
+    return '<div class="proj-row">'
+      + '<div class="proj-top"><span class="proj-client" title="'+esc(p.client?p.client.name:'—')+'">'+esc(p.client?p.client.name:'—')+'</span>'
+      + '<span class="proj-bal '+(p.bal<0?'neg':'pos')+'">'+minToHM(p.bal*60)+'</span></div>'
+      + '<div class="proj-bottom">'
+      +   '<div class="bar-track" style="flex:1;"><div class="bar-fill" style="width:'+p.pct+'%;background:var(--'+barClass+');"></div></div>'
+      +   '<span class="proj-analyst">'+esc(p.analyst?p.analyst.name:'—')+'</span>'
+      + '</div></div>';
+  }).join('');
+}
 
 function layoutDayEvents(scheds){
   const items = scheds.map(s=>({ s, start:timeToMin(s.startTime), end:Math.max(timeToMin(s.endTime), timeToMin(s.startTime)+15) }))
@@ -262,12 +285,16 @@ function renderDashboard(state){
 
   let chartsHtml = '';
 
-  const analystItems = analysts.map(a=>{
-    const mins = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange))
-      .reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
-    return {label:a.name, value:mins, display:minToHM(mins), dot:a.inactive?'#B9CAD5':a.color};
-  }).sort((x,y)=>y.value-x.value).slice(0,4);
-  chartsHtml += chartCard('⏱','Horas dos analistas','Concluídas neste mês', barList(analystItems, i=>i.dot||'var(--brand)'));
+  const projectItems = activeCards.map(c=>{
+    const client = byId(clients, c.clientId);
+    const board = boards.find(b=>b.id===c.boardId);
+    const analyst = board ? byId(analysts, board.analystId) : null;
+    const used = H.cardUsedMinutes(c)/60;
+    const pct = c.contractedHours ? Math.min(100, Math.max(0,(used/c.contractedHours)*100)) : 0;
+    const bal = H.cardBalanceHours(c);
+    return {client, analyst, pct, bal};
+  }).sort((a,b)=> b.pct-a.pct);
+  chartsHtml += chartCard('📁','Projetos em andamento', projectItems.length+' no total', projectList(projectItems));
 
   const balRows = activeCards.map(c=>({client:byId(clients,c.clientId), bal:H.cardBalanceHours(c)}))
     .filter(r=>r.client).sort((a,b)=>a.bal-b.bal).slice(0,4)
