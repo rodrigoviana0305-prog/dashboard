@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEO — Painel de Implantação</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg:#F4F7F9; --surface:#FFFFFF; --surface-2:#F7F9FB;
+    --border:#DCE5EB; --ink:#17324D; --ink-soft:#627486; --ink-faint:#8A9AAA;
+    --brand:#0B5C8E; --brand-dark:#073F63; --brand-soft:#E5F1F8;
+    --gold:#F0A72F; --gold-soft:#FFF1D8; --danger:#C94B42; --danger-soft:#FCE7E5;
+    --ok:#169B67; --ok-soft:#E2F5ED;
+    --shadow-1:0 2px 8px rgba(23,50,77,.06),0 1px 2px rgba(23,50,77,.04);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;}
+  .topbar{background:var(--brand-dark);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .topbar h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.2px;}
+  .topbar .updated{font-size:12px;opacity:.85;}
+  .wrap{max-width:1400px;margin:0 auto;padding:22px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-1);}
+  .kpi-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);}
+  .kpi-value{font-size:26px;font-weight:800;color:var(--brand-dark);margin:4px 0 2px;}
+  .kpi-sub{font-size:12px;color:var(--ink-soft);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .card-full{grid-column:1 / -1;}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-1);min-width:0;}
+  .section h2{font-size:15px;margin:0 0 3px;color:var(--brand-dark);}
+  .section p.desc{font-size:12px;color:var(--ink-faint);margin:0 0 14px;}
+  .empty{padding:24px;text-align:center;color:var(--ink-faint);font-size:13px;background:var(--surface-2);border-radius:10px;border:1px dashed var(--border);}
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;padding:9px 10px;background:var(--surface-2);color:var(--ink-soft);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;}
+  .bar-row{display:grid;grid-template-columns:130px 1fr 70px;align-items:center;gap:9px;font-size:12.5px;margin-bottom:10px;}
+  .bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bar-track{background:var(--surface-2);border-radius:999px;height:10px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:999px;background:var(--brand);}
+  .bar-value{text-align:right;font-weight:800;white-space:nowrap;}
+  .badge{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .neg{color:var(--danger);} .pos{color:var(--ok);}
+  #loading, #error{padding:60px 20px;text-align:center;color:var(--ink-soft);}
+  #error{color:var(--danger);display:none;}
+  @media screen and (max-width:820px){ .grid{grid-template-columns:1fr;} .bar-row{grid-template-columns:96px 1fr 60px;} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🗂️ NEO — Painel de Implantação</h1>
+  <span class="updated" id="updated-at">Carregando…</span>
+</div>
+
+<div id="loading">Carregando dados…</div>
+<div id="error"></div>
+<div class="wrap" id="app" style="display:none;"></div>
+
+<script>
+/* =========================================================================
+   CONFIGURAÇÃO — mesmo projeto Supabase que o Implanta já usa.
+   Este dashboard é SOMENTE LEITURA: nunca escreve na tabela app_state.
+   ========================================================================= */
+const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
+const REFRESH_MS = 60000; // atualiza sozinho a cada 60s
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ---- Helpers de data/hora (mesma lógica do Implanta) ---- */
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function currentMonthRange(){
+  const d = new Date();
+  const start = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+  const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const end = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(lastDay).padStart(2,'0');
+  return {start, end};
+}
+function dateInRange(iso, range){ return iso >= range.start && iso <= range.end; }
+function timeToMin(t){ if(!t) return 0; const [h,m] = t.split(':').map(Number); return h*60+m; }
+function isWeekdayISO(iso){ const d = new Date(iso+'T00:00:00'); const wd = d.getDay(); return wd!==0 && wd!==6; }
+function countWeekdaysBetweenISO(startIso, endIso){
+  let count = 0; let cur = new Date(startIso+'T00:00:00'); const end = new Date(endIso+'T00:00:00');
+  while(cur <= end){ if(cur.getDay()!==0 && cur.getDay()!==6) count++; cur.setDate(cur.getDate()+1); }
+  return count;
+}
+function minToHM(min){
+  const sign = min<0?'-':''; min = Math.abs(Math.round(min));
+  const h = Math.floor(min/60), m = min%60;
+  return sign + (m ? h+'h'+String(m).padStart(2,'0') : h+'h');
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---- Lógica de negócio replicada do Implanta (mesmas regras) ---- */
+const FERIAS_TYPE_NAME = 'Férias';
+const FERIAS_MIN_PER_WEEKDAY = 8*60+48;
+
+function buildHelpers(state){
+  function isFeriasType(name){ return !!(name && name.toLowerCase()===FERIAS_TYPE_NAME.toLowerCase()); }
+  function isInternalType(name){ const t=(state.agendaTypes||[]).find(t=>t.name===name); return !!(t && t.isInternal); }
+  function isServicoType(name){ const t=(state.agendaTypes||[]).find(t=>t.name===name); return !!(t && t.isServico); }
+  function scheduleAnalystIds(s){ return s.analystIds && s.analystIds.length ? s.analystIds : (s.analystId?[s.analystId]:[]); }
+  function scheduleDayCount(s){ if(!s.allDay) return 1; const a=new Date(s.date+'T00:00:00'), b=new Date((s.endDate||s.date)+'T00:00:00'); return Math.round((b-a)/86400000)+1; }
+  function scheduleMinutesPerAnalyst(s){
+    if(s.allDay){
+      if(isFeriasType(s.type)) return countWeekdaysBetweenISO(s.date, s.endDate||s.date) * FERIAS_MIN_PER_WEEKDAY;
+      return 8*60*scheduleDayCount(s);
+    }
+    return timeToMin(s.endTime)-timeToMin(s.startTime);
+  }
+  function scheduleActualMinutes(s){ const per=scheduleMinutesPerAnalyst(s); const n=Math.max(1, scheduleAnalystIds(s).length); return per*n; }
+  function cardUsedMinutes(card){
+    return (state.schedules||[]).filter(s=>s.cardId===card.id && s.status==='concluida')
+      .reduce((sum,s)=> sum + (s.deductMinutes!=null ? s.deductMinutes : scheduleActualMinutes(s)), 0);
+  }
+  function cardBalanceHours(card){ if(card.balanceForfeited) return 0; return (card.contractedHours||0) - cardUsedMinutes(card)/60; }
+  return { isFeriasType, isInternalType, isServicoType, scheduleAnalystIds, scheduleMinutesPerAnalyst, scheduleActualMinutes, cardUsedMinutes, cardBalanceHours };
+}
+
+function byId(arr, id){ return (arr||[]).find(x=>x.id===id); }
+
+/* ---- Renderização ---- */
+function renderDashboard(state){
+  const H = buildHelpers(state);
+  const clients = state.clients||[], analysts = state.analysts||[], boards = state.boards||[],
+        cards = state.cards||[], schedules = state.schedules||[];
+  const activeCards = cards.filter(c=>!c.isConcluded);
+  const monthRange = currentMonthRange();
+  const today = todayISO();
+
+  const totalBalance = cards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
+  const pendConf = schedules.filter(s=> s.status==='pendente' && !s.allDay && s.date <= today).length;
+
+  let html = '<div class="kpi-grid">';
+  html += kpi('📁','Projetos em andamento', activeCards.length, clients.length+' cliente(s) cadastrado(s)');
+  html += kpi('👤','Analistas ativos', analysts.filter(a=>!a.inactive).length, analysts.length+' no total');
+  html += kpi('⏳','Saldo total disponível', minToHM(totalBalance*60), totalBalance<0?'atenção: saldo negativo':'dentro do contratado', totalBalance<0);
+  html += kpi('🔔','Confirmações pendentes', pendConf, pendConf?'requer atenção':'tudo em dia', pendConf>0);
+  html += '</div><div class="grid">';
+
+  /* Projetos em andamento */
+  html += '<div class="section card-full"><h2>📁 Projetos em andamento</h2><p class="desc">Cards ainda não concluídos, ordenados por uso do saldo contratado.</p>';
+  if(!activeCards.length){ html += '<div class="empty">Nenhum projeto em andamento no momento.</div>'; }
+  else {
+    const rows = activeCards.map(c=>{
+      const client = byId(clients, c.clientId);
+      const board = byId(boards, c.boardId);
+      const analyst = board ? byId(analysts, board.analystId) : null;
+      const used = H.cardUsedMinutes(c)/60;
+      const pct = c.contractedHours ? Math.min(100, Math.max(0,(used/c.contractedHours)*100)) : 0;
+      const bal = H.cardBalanceHours(c);
+      return {client, analyst, pct, bal};
+    }).sort((a,b)=> b.pct-a.pct).slice(0,10);
+    html += '<table><thead><tr><th>Cliente</th><th>Analista</th><th>Progresso</th><th>Saldo</th></tr></thead><tbody>';
+    rows.forEach(r=>{
+      html += '<tr><td><strong>'+esc(r.client?r.client.name:'—')+'</strong></td><td>'+esc(r.analyst?r.analyst.name:'—')+'</td>'
+        + '<td><div class="bar-track" style="max-width:160px;"><div class="bar-fill" style="width:'+r.pct+'%;background:'+(r.pct>=90?'var(--danger)':r.pct>=70?'var(--gold)':'var(--brand)')+';"></div></div></td>'
+        + '<td class="'+(r.bal<0?'neg':'pos')+'" style="font-weight:800;">'+minToHM(r.bal*60)+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+
+  /* Tempo de trabalho dos analistas (mes atual) */
+  html += '<div class="section"><h2>⏱ Tempo de trabalho dos analistas</h2><p class="desc">Horas em agendas concluídas neste mês.</p>';
+  if(!analysts.length){ html += '<div class="empty">Nenhum analista cadastrado.</div>'; }
+  else {
+    const analystMin = analysts.map(a=>{
+      const mins = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange))
+        .reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
+      return {a, mins};
+    }).sort((x,y)=>y.mins-x.mins);
+    const maxMin = Math.max(1, ...analystMin.map(x=>x.mins));
+    analystMin.forEach(({a,mins})=>{
+      const pct = Math.round((mins/maxMin)*100);
+      html += '<div class="bar-row"><div class="bar-label">'+esc(a.name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(a.inactive?'#B9CAD5':'var(--brand)')+';"></div></div><div class="bar-value">'+minToHM(mins)+'</div></div>';
+    });
+  }
+  html += '</div>';
+
+  /* Horas do mes por tipo de agenda */
+  html += '<div class="section"><h2>🗓 Horas do mês por tipo de agenda</h2><p class="desc">Agendas concluídas neste mês, somadas por tipo.</p>';
+  const monthScheds = schedules.filter(s=>s.status==='concluida' && dateInRange(s.date, monthRange));
+  if(!monthScheds.length){ html += '<div class="empty">Nenhuma agenda concluída neste mês ainda.</div>'; }
+  else {
+    const byType = {};
+    monthScheds.forEach(s=>{ const n=Math.max(1,H.scheduleAnalystIds(s).length); byType[s.type] = (byType[s.type]||0) + H.scheduleMinutesPerAnalyst(s)*n; });
+    const entries = Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+    const maxMin = Math.max(1, ...entries.map(e=>e[1]));
+    entries.forEach(([typeName,mins])=>{
+      const pct = Math.round((mins/maxMin)*100);
+      html += '<div class="bar-row"><div class="bar-label">'+esc(typeName)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;"></div></div><div class="bar-value">'+minToHM(mins)+'</div></div>';
+    });
+  }
+  html += '</div>';
+
+  /* Modulos mais treinados */
+  html += '<div class="section card-full"><h2>🎓 Módulos mais treinados</h2><p class="desc">Ranking geral, considerando todas as agendas concluídas.</p>';
+  const moduleCounts = {};
+  schedules.filter(s=>s.status==='concluida').forEach(s=> (s.modules||[]).forEach(m=> moduleCounts[m]=(moduleCounts[m]||0)+1));
+  const modEntries = Object.entries(moduleCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if(!modEntries.length){ html += '<div class="empty">Nenhum módulo treinado registrado ainda.</div>'; }
+  else {
+    const maxCount = Math.max(1, ...modEntries.map(e=>e[1]));
+    modEntries.forEach(([name,count])=>{
+      const pct = Math.round((count/maxCount)*100);
+      html += '<div class="bar-row"><div class="bar-label">'+esc(name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--gold);"></div></div><div class="bar-value">'+count+'x</div></div>';
+    });
+  }
+  html += '</div>';
+
+  html += '</div>';
+  document.getElementById('app').innerHTML = html;
+}
+
+function kpi(icon, label, value, sub, warn){
+  return '<div class="kpi-card"><div class="kpi-label">'+icon+' '+esc(label)+'</div>'
+    + '<div class="kpi-value">'+esc(value)+'</div>'
+    + '<div class="kpi-sub" style="color:'+(warn?'var(--danger)':'var(--ink-soft)')+';">'+esc(sub)+'</div></div>';
+}
+
+/* ---- Busca dos dados e ciclo de atualização ---- */
+async function loadAndRender(){
+  try{
+    const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
+    if(error) throw error;
+    if(!data || !data.data){ throw new Error('Nenhum dado encontrado na tabela app_state.'); }
+    renderDashboard(data.data);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    const upd = data.updated_at ? new Date(data.updated_at) : new Date();
+    document.getElementById('updated-at').textContent = 'Dados de ' + upd.toLocaleString('pt-BR') + ' · atualiza sozinho a cada 1 min';
+  } catch(err){
+    console.error(err);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = 'Não foi possível carregar os dados: ' + (err.message || err);
+  }
+}
+
+loadAndRender();
+setInterval(loadAndRender, REFRESH_MS);
+</script>
+</body>
+</html>
