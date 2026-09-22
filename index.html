@@ -69,38 +69,12 @@
   .neg{color:var(--danger);} .pos{color:var(--ok);}
   .dot{width:clamp(10px,.85vw,14px);height:clamp(10px,.85vw,14px);border-radius:50%;flex:0 0 auto;}
 
-  /* ============ LISTA DE SALDO (sem barra) ============ */
-  .bal-row{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:clamp(8px,.8vw,14px);
-    padding:clamp(5px,.55vw,10px) 0;
-    border-bottom:1px solid var(--border);
-    font-size:clamp(15px,1.3vw,22px);
-  }
-  .bal-row:last-child{ border-bottom:none; }
-  .bal-label{
-    font-weight:700;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    min-width:0;
-    flex:1 1 auto;
-  }
-  .bal-value{
-    font-weight:800;
-    white-space:nowrap;
-    flex:0 0 auto;
-    font-size:clamp(14px,1.25vw,21px);
-  }
-
   /* ============ PROJETOS ============ */
   .proj-row{padding:clamp(6px,.65vw,12px) 0;border-bottom:1px solid var(--border);}
   .proj-row:last-child{border-bottom:none;}
-  .proj-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:4px;}
+  .proj-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
   .proj-client{font-weight:800;font-size:clamp(18px,1.65vw,28px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-  .proj-bal{font-weight:800;white-space:nowrap;font-size:clamp(17px,1.55vw,26px);}
+  .proj-bal{font-weight:800;white-space:nowrap;font-size:clamp(17px,1.55vw,26px);margin-left:auto;}
   .proj-meta{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin-bottom:6px;min-width:0;}
   .proj-analyst{font-size:clamp(15px,1.35vw,23px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:70%;}
   .proj-analyst .dot{width:clamp(10px,.85vw,14px);height:clamp(10px,.85vw,14px);}
@@ -108,6 +82,27 @@
   .proj-bottom .bar-track{height:clamp(10px,.9vw,15px);flex:1;}
   .projects-panel h2{font-size:clamp(22px,1.9vw,32px);}
   .projects-panel p.desc{font-size:clamp(14px,1.2vw,19px);margin-bottom:8px;}
+
+  /* Chips de produtos contratados ao lado do nome do cliente */
+  .proj-products{
+    display:inline-flex;
+    flex-wrap:wrap;
+    gap:4px;
+    flex:0 1 auto;
+    min-width:0;
+  }
+  .proj-chip{
+    font-size:clamp(10px,.85vw,14px);
+    font-weight:800;
+    letter-spacing:.2px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    line-height:1.35;
+    max-width:14ch;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
 
   /* ============ AGENDA ============ */
   .agenda-allday{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;flex:0 0 auto;}
@@ -274,27 +269,32 @@ function barList(items, colorFn){
   }).join('');
 }
 
-/* Lista sem barra — usada no card de "Horas disponíveis".
-   O nome ocupa todo o espaço e o valor fica alinhado à direita. */
-function balanceList(items){
-  if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
-  return items.map(i=>
-    '<div class="bal-row">'
-    + '<div class="bal-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
-    + '<div class="bal-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div>'
-    + '</div>'
-  ).join('');
+/* Chips dos produtos contratados (usado em "Projetos em andamento") */
+function productChipsHtml(productTags, productTagIds){
+  if(!productTagIds || !productTagIds.length) return '';
+  const tags = (productTagIds||[])
+    .map(id => (productTags||[]).find(t => t.id===id))
+    .filter(Boolean);
+  if(!tags.length) return '';
+  return '<span class="proj-products">' + tags.map(t=>{
+    const bg = t.color || 'var(--brand)';
+    const fg = readableTextColor(bg);
+    const dim = t.inactive ? ';opacity:.55;' : '';
+    return '<span class="proj-chip" style="background:'+bg+';color:'+fg+dim+'" title="'+esc(t.name)+'">'+esc(t.name)+'</span>';
+  }).join('') + '</span>';
 }
 
-function projectList(items){
+function projectList(items, productTags){
   if(!items.length) return '<div class="empty">Nenhum projeto em andamento.</div>';
   return items.map(p=>{
     const barClass = p.pct>=90?'danger':(p.pct>=70?'gold':'brand');
     const analystName = p.analyst ? p.analyst.name : '—';
     const analystColor = p.analyst ? (p.analyst.inactive ? '#B9CAD5' : p.analyst.color) : '#B9CAD5';
+    const chips = productChipsHtml(productTags, p.productTagIds);
     return '<div class="proj-row">'
       + '<div class="proj-top">'
       +   '<span class="proj-client" title="'+esc(p.client?p.client.name:'—')+'">'+esc(p.client?p.client.name:'—')+'</span>'
+      +   chips
       +   '<span class="proj-bal '+(p.bal<0?'neg':'pos')+'">'+minToHM(p.bal*60)+'</span>'
       + '</div>'
       + '<div class="proj-meta">'
@@ -389,7 +389,7 @@ function setupCarousel(el){
 function renderDashboard(state){
   const H = buildHelpers(state);
   const clients = state.clients||[], analysts = state.analysts||[], boards = state.boards||[],
-        cards = state.cards||[], schedules = state.schedules||[];
+        cards = state.cards||[], schedules = state.schedules||[], productTags = state.productTags||[];
   const activeCards = cards.filter(c=>!c.isConcluded);
   const monthRange = currentMonthRange();
   const today = todayISO();
@@ -428,13 +428,13 @@ function renderDashboard(state){
     const used = H.cardUsedMinutes(c)/60;
     const pct = c.contractedHours ? Math.min(100, Math.max(0,(used/c.contractedHours)*100)) : 0;
     const bal = H.cardBalanceHours(c);
-    return {client, analyst, pct, bal};
+    return {client, analyst, pct, bal, productTagIds: c.productTags || []};
   }).sort((a,b)=> b.pct-a.pct);
 
   document.getElementById('projects-panel').innerHTML =
       '<h2>📁 Projetos em andamento</h2>'
     + '<p class="desc">'+projectItems.length+' no total · ordenados por % de consumo</p>'
-    + '<div class="card-body"><div class="carousel" id="proj-carousel"><div class="carousel-inner">'+projectList(projectItems)+'</div></div></div>';
+    + '<div class="card-body"><div class="carousel" id="proj-carousel"><div class="carousel-inner">'+projectList(projectItems, productTags)+'</div></div></div>';
 
   let sideHtml = '';
 
@@ -442,8 +442,8 @@ function renderDashboard(state){
     .filter(r=> r.client && Math.abs(r.bal) > 0.0001)
     .sort((a,b)=> a.bal - b.bal)
     .map(r=>({label:r.client.name, value:Math.abs(r.bal), display:minToHM(r.bal*60), valueClass:r.bal<0?'neg':'pos'}));
-  const balBody = balanceList(balRows);
-  sideHtml += chartCardCarousel('💰','Horas disponíveis','Clientes com saldo ≠ 0', 'carousel-bal', balBody);
+  const balBody = barList(balRows, i=>i.valueClass==='neg'?'var(--danger)':'var(--ok)');
+  sideHtml += chartCardCarousel('💰','Horas disponíveis dos clientes','Todos os clientes com saldo ≠ 0', 'carousel-bal', balBody);
 
   const perfAnalysts = analysts.filter(a=> !EXCLUDE_ANALYST_NAMES.some(n=> (a.name||'').trim().toLowerCase().includes(n)));
   let analystHtml;
