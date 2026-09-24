@@ -220,7 +220,7 @@
 <script>
 const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
-const REFRESH_MS = 60000;
+const REFRESH_MS = 7200000; // 2 horas
 const EXCLUDE_ANALYST_NAMES = ['sabrina'];
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -705,11 +705,30 @@ setInterval(paintUpdatedAt, 1000);
 /* ============================================================
    CARREGAMENTO
    ============================================================ */
+let lastKnownUpdatedAt = null;
+
 async function loadAndRender(){
+  /* Verificação leve primeiro: pergunta só o updated_at (consulta minúscula)
+     antes de baixar o JSON inteiro do estado. Como este dashboard costuma
+     ficar ligado o dia inteiro numa TV, consultando a cada 1 minuto, baixar
+     o estado completo toda vez — mesmo quando nada mudou — consome banda
+     de saída à toa e pode estourar a cota do Supabase. Só baixa tudo de
+     novo quando o updated_at realmente mudou desde a última vez. */
+  if(lastKnownUpdatedAt){
+    const { data: probe, error: probeErr } = await sb.from('app_state').select('updated_at').eq('id', 1).maybeSingle();
+    if(probeErr) throw probeErr;
+    if(probe && probe.updated_at && probe.updated_at === lastKnownUpdatedAt){
+      lastRefreshAt = Date.now();
+      paintUpdatedAt();
+      return;
+    }
+  }
+
   const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
   if(error) throw error;
   if(!data || !data.data) throw new Error('Nenhum dado encontrado na tabela app_state.');
 
+  lastKnownUpdatedAt = data.updated_at;
   renderDashboard(data.data);
 
   document.getElementById('loading').style.display = 'none';
@@ -783,8 +802,9 @@ window.addEventListener('focus', ()=>{
 
 setInterval(()=>{
   const deadFor = Date.now() - lastRefreshAt;
-  if(deadFor > 30 * 60 * 1000){
-    console.warn('[NEO] sem atualização há 30 min — recarregando');
+  const maxDeadTime = Math.max(30 * 60 * 1000, REFRESH_MS * 3); // margem de segurança proporcional ao intervalo configurado
+  if(deadFor > maxDeadTime){
+    console.warn('[NEO] sem atualização há muito tempo — recarregando');
     location.reload();
   }
 }, 60000);
