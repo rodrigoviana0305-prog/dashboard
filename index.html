@@ -737,7 +737,7 @@ async function loadAndRender(){
     return;
   }
 
-  const results = await Promise.all(changedEntries.map(({table}) => sb.from(table).select('id, data')));
+  const results = await Promise.all(changedEntries.map(({table}) => sb.from(table).select('data')));
   results.forEach(r=>{ if(r.error) throw r.error; });
   changedEntries.forEach(({key}, i)=>{ dashState[key] = (results[i].data||[]).map(row=>row.data); });
   tableUpdatedAt = meta;
