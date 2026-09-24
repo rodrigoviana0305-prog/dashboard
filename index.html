@@ -1589,6 +1589,8 @@ var ui = {
   scheduleModuleTab: null,
   cardForecastModuleTab: null,
   reportsTab: 'saldo',
+  analistasStatusFilter: 'active',
+  distribuicaoStatus: 'ativos',
   prazoAnalyst: 'all',
   tableSort: {},
   reportsDateStart: '',
@@ -1626,6 +1628,29 @@ var ui = {
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function addDaysISO(iso,n){ const [y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()+n); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+/* Soma N meses a uma data ISO, preservando o dia do mês sempre que possível —
+   quando o mês de destino é mais curto (ex: 31/01 + 1 mês), cai pro último
+   dia daquele mês em vez de "vazar" pro mês seguinte (31/01 -> 28 ou 29/02,
+   nunca 02 ou 03/03). */
+function addMonthsISO(iso, n){
+  const [y,m,d] = iso.split('-').map(Number);
+  const first = new Date(y, m-1+n, 1);
+  const lastDayOfTargetMonth = new Date(first.getFullYear(), first.getMonth()+1, 0).getDate();
+  const day = Math.min(d, lastDayOfTargetMonth);
+  const dt = new Date(first.getFullYear(), first.getMonth(), day);
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+const REPEAT_FREQ_LABELS = { daily:'1 dia', weekly:'1 semana', biweekly:'15 dias', monthly:'1 mês' };
+/* Avança `iso` em `n` intervalos da frequência escolhida (n>=1 = data da
+   n-ésima repetição depois da agenda original). "Quinzenal" aqui é literal:
+   a cada 15 dias corridos (não "2x por mês" nem "toda 2ª semana"). */
+function addRepeatInterval(iso, freq, n){
+  if(freq==='daily') return addDaysISO(iso, n);
+  if(freq==='weekly') return addDaysISO(iso, n*7);
+  if(freq==='biweekly') return addDaysISO(iso, n*15);
+  if(freq==='monthly') return addMonthsISO(iso, n);
+  return iso;
+}
 function startOfWeekISO(iso){ const [y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d); const wd=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-wd); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
 function fmtDateBR(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
 const WD_NAMES = ['seg','ter','qua','qui','sex','sáb','dom'];
@@ -2531,14 +2556,16 @@ function renderSidebar(){
     + '<span>▦</span><span style="flex:1;">Todos os analistas</span>'
     + (totalPendingBoardBadge()? '<span class="side-badge">'+totalPendingBoardBadge()+'</span>' : '')
     + '</button>';
-  state.analysts.forEach(a=>{
+  /* Analistas inativos não aparecem como item individual nesta lista — só dá
+     pra chegar aos quadros/cards deles através de "Todos os analistas"
+     (que continua trazendo TODOS os quadros, ativos e inativos, sem filtro). */
+  state.analysts.filter(a=>!a.inactive).forEach(a=>{
     const myId = myAnalystId();
     const pend = (!myId || a.id===myId) ? notificationItemsForAnalyst(a.id).length : 0;
     const active = ui.view==='board' && ui.boardAnalystFilter===a.id;
-    const inativo = !!a.inactive;
-    html += '<button class="side-item'+(active?' active':'')+(inativo?' inactive-analyst':'')+'" data-action="board-analyst-filter" data-id="'+a.id+'">'
-      + (a.photo ? analystAvatar(a,22) : '<span class="side-dot" style="background:'+(inativo?'#B9CAD5':a.color)+'"></span>')
-      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(a.name)+(a.isAdmin?' <span style="font-size:9px;font-weight:800;color:#F0A72F;letter-spacing:.5px;">ADMIN</span>':'')+(inativo?' <span style="font-size:9px;font-weight:700;color:#8A9AAA;letter-spacing:.4px;">INATIVO</span>':'')+'</span>'
+    html += '<button class="side-item'+(active?' active':'')+'" data-action="board-analyst-filter" data-id="'+a.id+'">'
+      + (a.photo ? analystAvatar(a,22) : '<span class="side-dot" style="background:'+a.color+'"></span>')
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(a.name)+(a.isAdmin?' <span style="font-size:9px;font-weight:800;color:#F0A72F;letter-spacing:.5px;">ADMIN</span>':'')+'</span>'
       + (pend? '<span class="side-badge">'+pend+'</span>' : '')
       + '</button>';
   });
@@ -2613,8 +2640,10 @@ function renderTopbar(){
         : 'Quadro consolidado • Todos os analistas')+'</div></div>'
       + '<select class="board-analyst-filter" data-action="board-analyst-filter" title="Filtrar analista">'
       + '<option value="all"'+(ui.boardAnalystFilter==='all'?' selected':'')+'>Todos os analistas</option>';
-    state.analysts.forEach(a=>{
-      left += '<option value="'+a.id+'"'+(ui.boardAnalystFilter===a.id?' selected':'')+'>'+esc(a.name)+(a.inactive?' (inativo)':'')+'</option>';
+    /* Mesma regra da lista lateral: analista inativo não aparece como opção
+       individual — os cards dele continuam em "Todos os analistas". */
+    state.analysts.filter(a=>!a.inactive).forEach(a=>{
+      left += '<option value="'+a.id+'"'+(ui.boardAnalystFilter===a.id?' selected':'')+'>'+esc(a.name)+'</option>';
     });
     left += '</select>'
       + '<div class="search-box" style="margin-left:8px;"><span>🔎</span><input id="search-input" placeholder="Buscar cliente..." value="'+esc(ui.search)+'"></div>'
@@ -4021,11 +4050,24 @@ function renderReportsView(){
     +   '<p class="report-section-desc">Sessões concluídas e total de horas realizadas por cada analista no período selecionado. A coluna "Clientes" conta apenas cards <strong>não concluídos</strong>.'+(ui.reportsClientFilter!=='all'?' Filtrado para o cliente selecionado acima.':'')+'</p>'
     + '</div>'
     + '</div>';
-  if(!state.analysts.length){
-    html += '<div class="report-empty">Nenhum analista cadastrado.</div>';
+  const analistasStatusFilter = ['active','inactive','all'].includes(ui.analistasStatusFilter) ? ui.analistasStatusFilter : 'active';
+  const analystsForGrid = state.analysts.filter(a=>{
+    if(analistasStatusFilter==='active') return !a.inactive;
+    if(analistasStatusFilter==='inactive') return !!a.inactive;
+    return true;
+  });
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    + '<span class="hint" style="margin:0;">Mostrar:</span>';
+  [['active','Ativos'],['inactive','Inativos'],['all','Todos']].forEach(([val,label])=>{
+    const active = analistasStatusFilter===val;
+    html += '<button class="btn btn-sm'+(active?' btn-primary':'')+'" data-action="analistas-status-filter" data-value="'+val+'">'+label+'</button>';
+  });
+  html += '</div>';
+  if(!analystsForGrid.length){
+    html += '<div class="report-empty">Nenhum analista '+(analistasStatusFilter==='active'?'ativo':analistasStatusFilter==='inactive'?'inativo':'cadastrado')+'.</div>';
   } else {
     const analistasSort = getTableSort('analistas-cards', 'name', 'asc');
-    const analystRows = state.analysts.map(a=>{
+    const analystRows = analystsForGrid.map(a=>{
       let scheds = schedulesForAnalyst(a.id).filter(s=>s.status==='concluida' && dateInRange(s.date, dateRange));
       if(ui.reportsClientFilter!=='all') scheds = scheds.filter(s=> s.clientId===ui.reportsClientFilter);
       const totalMin = scheds.reduce((sum,s)=> sum + scheduleMinutesPerAnalyst(s), 0);
@@ -4092,6 +4134,12 @@ function renderReportsView(){
     +   '<p class="report-section-desc">Em qual estágio cada cliente está no quadro do analista responsável.'+(ui.reportsClientFilter!=='all'?' Filtrado para o cliente selecionado acima.':'')+'</p>'
     + '</div>'
     + '</div>';
+  const distribuicaoStatus = ['ativos','todos','concluidos'].includes(ui.distribuicaoStatus) ? ui.distribuicaoStatus : 'ativos';
+  html += '<div class="field" style="max-width:240px;margin-bottom:14px;"><label>Situação do card</label><select id="distribuicao-status-filter" data-action="distribuicao-status-filter">'
+    + '<option value="ativos" '+(distribuicaoStatus==='ativos'?'selected':'')+'>Ativos</option>'
+    + '<option value="todos" '+(distribuicaoStatus==='todos'?'selected':'')+'>Todos</option>'
+    + '<option value="concluidos" '+(distribuicaoStatus==='concluidos'?'selected':'')+'>Concluídos</option>'
+    + '</select></div>';
   if(!state.analysts.length){
     html += '<div class="report-empty">Nenhum analista cadastrado.</div>';
   } else {
@@ -4100,6 +4148,8 @@ function renderReportsView(){
       const board = boardOfAnalyst(a.id);
       let cards = board ? cardsInBoard(board.id) : [];
       if(ui.reportsClientFilter!=='all') cards = cards.filter(c=> c.clientId===ui.reportsClientFilter);
+      if(distribuicaoStatus==='ativos') cards = cards.filter(c=>!c.isConcluded);
+      else if(distribuicaoStatus==='concluidos') cards = cards.filter(c=>c.isConcluded);
       return {a, board, cards};
     });
     const distAccessor = (r,key)=>{
@@ -4113,7 +4163,7 @@ function renderReportsView(){
     html += '<div class="report-table-wrap"><table class="report-table">'
       + '<thead><tr>'
       + sortableTh('distribuicao','analyst','Analista',distSort)
-      + sortableTh('distribuicao','count','Clientes em implantação',distSort)
+      + sortableTh('distribuicao','count',distribuicaoStatus==='concluidos'?'Clientes concluídos':(distribuicaoStatus==='todos'?'Clientes (ativos + concluídos)':'Clientes em implantação'),distSort)
       + '</tr></thead><tbody>';
     sortedDistRows.forEach(({a, board, cards})=>{
       const names = cards.map(c=>{
@@ -5477,7 +5527,9 @@ function renderScheduleForm(m){
     linkCardId: draft ? (draft.linkCardId || defaultLinkCardId) : defaultLinkCardId,
     notes: draft ? (draft.notes||'') : (editing ? editing.notes : ''),
     attachments: draft ? (draft.attachments||[]) : (editing ? (editing.attachments||[]) : []),
-    jiraRequirementIds: draft ? (draft.jiraRequirementIds||[]) : (editing ? (editing.jiraRequirementIds||[]) : [])
+    jiraRequirementIds: draft ? (draft.jiraRequirementIds||[]) : (editing ? (editing.jiraRequirementIds||[]) : []),
+    repeatFreq: draft ? (draft.repeatFreq||'none') : 'none',
+    repeatCount: draft ? (draft.repeatCount||'4') : '4'
   };
   let html = '<div class="modal-header"><h3>'+(editing?'Editar agendamento':'Novo agendamento')+'</h3><button class="modal-close" data-action="close-modal">✕</button></div>';
   if(ui.formErr){ html += '<div class="error-msg">'+esc(ui.formErr)+'</div>'; }
@@ -5545,6 +5597,22 @@ function renderScheduleForm(m){
       + '<div class="field"><label>Fim</label><input type="time" name="endTime" value="'+esc(eff.endTime)+'"></div></div>';
   }
 
+  if(!editing){
+    html += '<div class="field-row">'
+      + '<div class="field"><label>Repetir agenda</label><select name="repeatFreq">'
+      +   '<option value="none" '+(eff.repeatFreq==='none'?'selected':'')+'>Não repetir</option>'
+      +   '<option value="daily" '+(eff.repeatFreq==='daily'?'selected':'')+'>Diariamente</option>'
+      +   '<option value="weekly" '+(eff.repeatFreq==='weekly'?'selected':'')+'>Semanalmente</option>'
+      +   '<option value="biweekly" '+(eff.repeatFreq==='biweekly'?'selected':'')+'>Quinzenalmente (a cada 15 dias)</option>'
+      +   '<option value="monthly" '+(eff.repeatFreq==='monthly'?'selected':'')+'>Mensalmente</option>'
+      +   '</select></div>'
+      + (eff.repeatFreq!=='none' ? '<div class="field"><label>Quantas vezes repetir</label><input type="number" name="repeatCount" min="1" max="52" value="'+esc(String(eff.repeatCount))+'"></div>' : '')
+      + '</div>';
+    if(eff.repeatFreq!=='none'){
+      html += '<div class="hint" style="margin:-6px 0 10px;">Serão criadas '+esc(String(eff.repeatCount))+' repetição(ões) além desta, no(s) mesmo(s) horário(s) e com o(s) mesmo(s) analista(s), avançando a data '+esc(REPEAT_FREQ_LABELS[eff.repeatFreq]||'')+' a cada repetição (máx. 52). Se alguma data cair em conflito de horário, nenhuma agenda é criada — ajuste a quantidade, a frequência ou o horário antes de salvar.</div>';
+    }
+  }
+
   html += '<div class="field"><label>Tipo</label><select name="type">';
   const catFilter = eff.category;
   state.agendaTypes.forEach(t=>{
@@ -5589,6 +5657,7 @@ function renderScheduleForm(m){
   html += '<div class="section-card" style="margin:12px 0 0;padding:12px 13px;">'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;">'
     +'<strong style="color:var(--brand-dark);">⌁ Requisitos Jira</strong>'
+    +'<button type="button" class="btn btn-sm btn-primary" data-action="schedule-jira-create" data-id="'+(editing?editing.id:'')+'" '+(editing?'':'disabled')+'>🎫 Abrir chamado no Jira</button>'
     +'<button type="button" class="btn btn-sm btn-ghost" data-action="schedule-jira-add" data-id="'+(editing?editing.id:'')+'" '+(editing?'':'disabled')+'>+ Vincular requisito Jira</button>'
     +(editing?'<span class="hint" style="margin:0;">'+(eff.jiraRequirementIds||[]).length+' vinculado(s)</span>':'<span class="hint" style="margin:0;">Salve a agenda primeiro para vincular.</span>')
     +'</div>';
@@ -5804,6 +5873,59 @@ document.addEventListener('click', function(e){
     ui.modal={type:'jira-requirement', scheduleId};
     render();
   }
+  else if(a==='schedule-jira-create'){
+    /* Cria um chamado DE VERDADE no Jira (via /api/jira-create-issue.php,
+       que fala com a API do Jira usando as credenciais configuradas como
+       variável de ambiente no servidor — ver LEIA-ME.md da integração) a
+       partir dos dados desta agenda, e já registra + vincula o resultado
+       como um Requisito Jira aqui no Implanta. Diferente de "+ Vincular
+       requisito Jira", que só registra um link colado manualmente, este
+       botão realmente ABRE o chamado no Jira. */
+    const scheduleId=el.dataset.id;
+    if(!scheduleId){ showAlert('Salve a agenda antes de abrir um chamado no Jira.'); return; }
+    if(el.disabled) return;
+    const sc=byId(state.schedules,scheduleId);
+    if(!sc){ showAlert('Agenda não encontrada.'); return; }
+    el.disabled=true; el.textContent='Criando chamado...';
+    const client = sc.clientId ? getClient(sc.clientId) : null;
+    const analystNames = scheduleAnalystIds(sc).map(aid=>{ const an=getAnalyst(aid); return an?an.name:''; }).filter(Boolean).join(', ');
+    const payload = {
+      clientName: client ? client.name : '',
+      clientCode: client ? (client.code||'') : '',
+      analystNames,
+      scheduleType: sc.type || '',
+      date: scheduleDateText(sc),
+      startTime: sc.allDay ? '' : (sc.startTime||''),
+      endTime: sc.allDay ? '' : (sc.endTime||''),
+      notes: sc.notes || ''
+    };
+    (async()=>{
+      let data=null, ok=false, httpStatus=0;
+      try{
+        const resp = await fetch('/api/jira-create-issue.php', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        httpStatus = resp.status;
+        ok = resp.ok;
+        try{ data = await resp.json(); }catch(e){ data = null; }
+      }catch(networkErr){
+        showAlert('Não foi possível falar com a integração do Jira (falha de rede). Confirme que a integração foi implantada no servidor (ver LEIA-ME.md — api/jira-create-issue.php) e tente de novo.\n\nDetalhe técnico: '+(networkErr && networkErr.message ? networkErr.message : networkErr));
+        render();
+        return;
+      }
+      if(!ok || !data || !data.key){
+        const msg = (data && data.error) ? data.error : ('Falha ao criar o chamado no Jira (HTTP '+httpStatus+').');
+        showAlert(msg);
+        render();
+        return;
+      }
+      const r = { id: uid('jr'), number: data.key, link: data.url||'', status:'ABERTO', clientId: sc.clientId||'', scheduleId: sc.id, createdAt: Date.now() };
+      state.jiraRequirements.push(r);
+      linkJiraRequirementToSchedule(r.id, sc.id);
+      ui.formSuccess = '✓ Chamado '+data.key+' criado no Jira e vinculado a esta agenda.';
+      render();
+    })();
+  }
   else if(a==='schedule-jira-unlink'){
     const reqId=el.dataset.req, scheduleId=el.dataset.id;
     unlinkJiraRequirementFromSchedule(reqId);
@@ -5905,6 +6027,10 @@ document.addEventListener('click', function(e){
     else { ui.tableSort[tableKey] = {key:key, dir:'asc'}; }
     render();
   }
+  else if(a==='analistas-status-filter'){
+    ui.analistasStatusFilter = ['active','inactive','all'].includes(el.dataset.value) ? el.dataset.value : 'active';
+    render();
+  }
   else if(a==='cal-mode'){
     ui.calMode = el.dataset.mode==='day' ? 'day' : 'week';
     ui.calModeUserSet = true;
@@ -5985,6 +6111,7 @@ document.addEventListener('change', function(e){
     else if(e.target.id==='dash-status-filter') ui.dashboardStatus=e.target.value;
     render();
   }
+  else if(e.target.id==='distribuicao-status-filter'){ ui.distribuicaoStatus = e.target.value; render(); }
   else if(e.target.id==='cal-analyst-filter'){ ui.calAnalyst = e.target.value; render(); }
   else if(e.target.id==='prazo-analyst-filter'){ ui.prazoAnalyst = e.target.value; render(); }
   else if(e.target.id==='cal-category-filter'){ ui.calCategory = e.target.value; render(); }
@@ -6075,6 +6202,10 @@ document.addEventListener('change', function(e){
     if(ui.modal){ ui.modal.values = values; render(); }
   }
   else if(e.target.matches('form[data-form="schedule"] select[name="type"]')){
+    const form = e.target.closest('form'); const values = captureFormValues(form);
+    if(ui.modal){ ui.modal.values = values; render(); }
+  }
+  else if(e.target.matches('form[data-form="schedule"] select[name="repeatFreq"]')){
     const form = e.target.closest('form'); const values = captureFormValues(form);
     if(ui.modal){ ui.modal.values = values; render(); }
   }
@@ -6294,6 +6425,30 @@ document.addEventListener('submit', async function(e){
     if(!allDay && scheduleConflict(analystIds, date, startTime, endTime, id||null, false)){ ui.formErr = 'Conflito de horário.'; render(); return; }
     ui.formErr = '';
 
+    /* Repetição da agenda (só se aplica à criação de uma agenda nova — repetir
+       uma edição não faz sentido, essa tela já é a de UMA ocorrência específica).
+       Valida TODAS as datas extras antes de criar qualquer coisa: se uma delas
+       cair em conflito, nada é salvo (nem a agenda original), pra não deixar a
+       série pela metade — o usuário ajusta e tenta salvar de novo. */
+    const repeatFreq = !id ? (fd.get('repeatFreq') || 'none') : 'none';
+    const repeatCountRaw = parseInt(fd.get('repeatCount'), 10) || 0;
+    const repeatCount = repeatFreq!=='none' ? Math.max(1, Math.min(52, repeatCountRaw||4)) : 0;
+    const allDaySpanDays = allDay ? Math.round((new Date(endDate+'T00:00:00') - new Date(date+'T00:00:00'))/86400000) : 0;
+    const repeatOccurrences = [];
+    if(repeatFreq!=='none' && repeatCount>0){
+      for(let i=1;i<=repeatCount;i++){
+        const occDate = addRepeatInterval(date, repeatFreq, i);
+        const occEndDate = allDay ? addDaysISO(occDate, allDaySpanDays) : occDate;
+        repeatOccurrences.push({date: occDate, endDate: occEndDate});
+      }
+      if(!allDay){
+        for(const occ of repeatOccurrences){
+          if(hasAllDayBlocking(analystIds, occ.date, null)){ ui.formErr = 'A repetição de '+fmtDateBR(occ.date)+' cai num dia todo já ocupado para o(s) analista(s). Ajuste a quantidade, a frequência ou o horário.'; render(); return; }
+          if(scheduleConflict(analystIds, occ.date, startTime, endTime, null, false)){ ui.formErr = 'A repetição de '+fmtDateBR(occ.date)+' conflita com outra agenda do(s) analista(s). Ajuste a quantidade, a frequência ou o horário.'; render(); return; }
+        }
+      }
+    }
+
     const isInternal = isInternalType(typeName);
     let resolvedCardId = cardIdFromCtx;
     let askAfterSave = false;
@@ -6339,13 +6494,26 @@ document.addEventListener('submit', async function(e){
     if(id){ updateSchedule(id, data); savedSchedule = byId(state.schedules, id); }
     else { savedSchedule = createSchedule(data); }
     if(savedSchedule && savedSchedule.cardId) syncCardStartDateFromSchedules(savedSchedule.cardId);
+    let repeatCreatedCount = 0;
+    if(!id && repeatOccurrences.length){
+      repeatOccurrences.forEach(occ=>{
+        const occData = Object.assign({}, data, {
+          date: occ.date, endDate: occ.endDate,
+          modules: (data.modules||[]).slice(), trainedScreens: (data.trainedScreens||[]).slice(),
+          attachments: [], jiraRequirementIds: []
+        });
+        const occSchedule = createSchedule(occData);
+        if(occSchedule && occSchedule.cardId) syncCardStartDateFromSchedules(occSchedule.cardId);
+        repeatCreatedCount++;
+      });
+    }
     if(askAfterSave && savedSchedule && savedSchedule.clientId && !savedSchedule.cardId){
       ui.modal = { type:'internal-ask-board', payload:{ scheduleId: savedSchedule.id } };
     } else if(savedSchedule){
       /* Mantém a tela aberta após salvar — agora editando a agenda recém-salva —
          em vez de fechar sozinha. O usuário decide quando fechar. */
       ui.modal = { type:'schedule-edit', id: savedSchedule.id };
-      ui.formSuccess = '✓ Agenda salva.';
+      ui.formSuccess = repeatCreatedCount ? ('✓ Agenda salva + '+repeatCreatedCount+' repetição(ões) criada(s).') : '✓ Agenda salva.';
     } else {
       ui.modal = null;
     }
