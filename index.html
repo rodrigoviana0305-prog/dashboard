@@ -224,6 +224,24 @@ const REFRESH_MS = 7200000; // 2 horas
 const EXCLUDE_ANALYST_NAMES = ['sabrina'];
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* Banco dividido em tabelas por entidade — o dashboard (somente leitura)
+   consulta a tabela sync_meta primeiro (carimbos de data, poucos bytes) e só
+   busca de novo as tabelas que realmente mudaram desde a última vez. */
+const ENTITY_TABLES = [
+  {key:'clients', table:'clients'},
+  {key:'analysts', table:'analysts'},
+  {key:'boards', table:'boards'},
+  {key:'cards', table:'cards'},
+  {key:'schedules', table:'schedules'},
+  {key:'productTags', table:'product_tags'},
+  {key:'modules', table:'modules'},
+  {key:'screens', table:'screens'},
+  {key:'agendaTypes', table:'agenda_types'},
+  {key:'jiraRequirements', table:'jira_requirements'}
+];
+let tableUpdatedAt = {};
+let dashState = {};
+
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function currentMonthRange(){
   const d = new Date();
@@ -702,34 +720,32 @@ function paintUpdatedAt(){
 
 setInterval(paintUpdatedAt, 1000);
 
-/* ============================================================
-   CARREGAMENTO
-   ============================================================ */
 let lastKnownUpdatedAt = null;
 
 async function loadAndRender(){
-  /* Verificação leve primeiro: pergunta só o updated_at (consulta minúscula)
-     antes de baixar o JSON inteiro do estado. Como este dashboard costuma
-     ficar ligado o dia inteiro numa TV, consultando a cada 1 minuto, baixar
-     o estado completo toda vez — mesmo quando nada mudou — consome banda
-     de saída à toa e pode estourar a cota do Supabase. Só baixa tudo de
-     novo quando o updated_at realmente mudou desde a última vez. */
-  if(lastKnownUpdatedAt){
-    const { data: probe, error: probeErr } = await sb.from('app_state').select('updated_at').eq('id', 1).maybeSingle();
-    if(probeErr) throw probeErr;
-    if(probe && probe.updated_at && probe.updated_at === lastKnownUpdatedAt){
-      lastRefreshAt = Date.now();
-      paintUpdatedAt();
-      return;
-    }
+  const { data: metaRows, error: metaErr } = await sb.from('sync_meta').select('table_name, updated_at');
+  if(metaErr) throw metaErr;
+  const meta = {};
+  (metaRows||[]).forEach(r=> meta[r.table_name] = r.updated_at);
+
+  const isFirstLoad = !lastKnownUpdatedAt;
+  const changedEntries = ENTITY_TABLES.filter(({table}) => isFirstLoad || (meta[table] && meta[table] !== tableUpdatedAt[table]));
+
+  if(!changedEntries.length){
+    lastRefreshAt = Date.now();
+    paintUpdatedAt();
+    return;
   }
 
-  const { data, error } = await sb.from('app_state').select('data, updated_at').eq('id', 1).maybeSingle();
-  if(error) throw error;
-  if(!data || !data.data) throw new Error('Nenhum dado encontrado na tabela app_state.');
+  const results = await Promise.all(changedEntries.map(({table}) => sb.from(table).select('data')));
+  results.forEach(r=>{ if(r.error) throw r.error; });
+  changedEntries.forEach(({key}, i)=>{ dashState[key] = (results[i].data||[]).map(row=>row.data); });
+  tableUpdatedAt = meta;
+  lastKnownUpdatedAt = true;
 
-  lastKnownUpdatedAt = data.updated_at;
-  renderDashboard(data.data);
+  if(!Object.keys(dashState).length) throw new Error('Nenhum dado encontrado nas tabelas.');
+
+  renderDashboard(dashState);
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('error').style.display = 'none';
