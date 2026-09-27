@@ -221,7 +221,6 @@
 const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
 const REFRESH_MS = 7200000; // 2 horas
-const EXCLUDE_ANALYST_NAMES = ['sabrina'];
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* Banco dividido em tabelas por entidade — o dashboard (somente leitura)
@@ -302,6 +301,29 @@ function buildHelpers(state){
 }
 function byId(arr, id){ return (arr||[]).find(x=>x.id===id); }
 
+/* Mesma regra do app principal (implanta.html): uma agenda "vencida" é uma
+   pendente cuja data/hora já passou. Uma agenda pendente cujo horário ainda
+   não chegou NÃO conta aqui — ainda está em dia. */
+function scheduleIsDue(s){
+  if(s.status!=='pendente') return false;
+  const dueDate = s.allDay ? (s.endDate||s.date) : s.date;
+  const end = new Date(dueDate+'T'+(s.allDay ? '23:59' : (s.endTime||'00:00'))+':00');
+  return end.getTime() < Date.now();
+}
+
+/* Lista de agendas vencidas — mesmo visual da lista de saldo (sem barra),
+   mas com a cor indicando o motivo (vencida vs. marcada como não
+   realizada) em vez de positivo/negativo. */
+function overdueList(items){
+  if(!items.length) return '<div class="empty">Nenhuma agenda vencida. Tudo em dia! ✅</div>';
+  return items.map(i=>
+    '<div class="bal-row">'
+    + '<div class="bal-label" title="'+esc(i.label)+(i.analystNames?' · '+esc(i.analystNames):'')+'">'+esc(i.label)+(i.analystNames?' <span style="color:var(--ink-faint);font-weight:600;">· '+esc(i.analystNames)+'</span>':'')+'</div>'
+    + '<div class="bal-value" style="color:'+i.color+';">'+esc(i.display)+'</div>'
+    + '</div>'
+  ).join('');
+}
+
 function barList(items, colorFn){
   if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
   const max = Math.max(1, ...items.map(i=>i.value));
@@ -311,18 +333,6 @@ function barList(items, colorFn){
       + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(colorFn?colorFn(i):'var(--brand)')+';"></div></div>'
       + '<div class="bar-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div></div>';
   }).join('');
-}
-
-/* Lista sem barra — usada no card "Horas disponíveis".
-   O nome ocupa todo o espaço e o valor fica alinhado à direita. */
-function balanceList(items){
-  if(!items.length) return '<div class="empty">Nenhum dado no momento.</div>';
-  return items.map(i=>
-    '<div class="bal-row">'
-    + '<div class="bal-label" title="'+esc(i.label)+'">'+esc(i.label)+'</div>'
-    + '<div class="bal-value '+(i.valueClass||'')+'">'+esc(i.display!=null?i.display:i.value)+'</div>'
-    + '</div>'
-  ).join('');
 }
 
 /* Chips dos produtos contratados (usado em "Projetos em andamento") */
@@ -446,14 +456,26 @@ function renderDashboard(state){
   const H = buildHelpers(state);
   const clients = state.clients||[], analysts = state.analysts||[], boards = state.boards||[],
         cards = state.cards||[], schedules = state.schedules||[], productTags = state.productTags||[];
-  const activeCards = cards.filter(c=>!c.isConcluded);
+
+  /* Analistas com privilégio "Suporte" (mesmo campo state.analysts[].isSupport
+     usado no app principal, ex: activeAnalysts()) não devem aparecer em NADA
+     deste dashboard — nem nos quadros de projetos/saldo, nem na agenda do
+     dia, nem nos KPIs agregados. Antes disso era feito por um filtro frágil
+     de nome (EXCLUDE_ANALYST_NAMES), só aplicado em "Desempenho por
+     analista"; agora a exclusão é por papel e vale em todo o dashboard. */
+  const supportAnalystIds = new Set(analysts.filter(a=>a.isSupport).map(a=>a.id));
+  const supportBoardIds = new Set(boards.filter(b=>supportAnalystIds.has(b.analystId)).map(b=>b.id));
+  const visibleCards = cards.filter(c=> !supportBoardIds.has(c.boardId));
+  const visibleSchedules = schedules.filter(s=> !H.scheduleAnalystIds(s).some(id=>supportAnalystIds.has(id)));
+
+  const activeCards = visibleCards.filter(c=>!c.isConcluded);
   const monthRange = currentMonthRange();
   const today = todayISO();
 
-  const totalBalance = cards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
+  const totalBalance = visibleCards.reduce((s,c)=> s + H.cardBalanceHours(c), 0);
 
   let totalAbatidoMin = 0;
-  schedules.forEach(s=>{
+  visibleSchedules.forEach(s=>{
     if(s.status!=='concluida') return;
     if(!s.cardId) return;
     if(s.deductMinutes === 0) return;
@@ -461,7 +483,7 @@ function renderDashboard(state){
   });
 
   const naoAbatidoByClient = {};
-  schedules.forEach(s=>{
+  visibleSchedules.forEach(s=>{
     if(s.status!=='concluida' || !H.isInternalType(s.type) || !s.clientId) return;
     const isUnlinked = !s.cardId, isZeroed = s.cardId && s.deductMinutes===0;
     if(!isUnlinked && !isZeroed) return;
@@ -475,7 +497,7 @@ function renderDashboard(state){
     + kpi('✔','Horas abatidas', minToHM(totalAbatidoMin))
     + kpi('⚑','Horas sem abatimento', minToHM(totalNaoAbatido));
 
-  renderAgendaDoDia(state, H, today, clients, analysts);
+  renderAgendaDoDia(state, H, today, clients, analysts, supportAnalystIds);
 
   const projectItems = activeCards.map(c=>{
     const client = byId(clients, c.clientId);
@@ -494,14 +516,30 @@ function renderDashboard(state){
 
   let sideHtml = '';
 
-  const balRows = activeCards.map(c=>({client:byId(clients,c.clientId), bal:H.cardBalanceHours(c)}))
-    .filter(r=> r.client && Math.abs(r.bal) > 0.0001)
-    .sort((a,b)=> a.bal - b.bal)
-    .map(r=>({label:r.client.name, value:Math.abs(r.bal), display:minToHM(r.bal*60), valueClass:r.bal<0?'neg':'pos'}));
-  const balBody = balanceList(balRows);
-  sideHtml += chartCardCarousel('💰','Horas disponíveis','Clientes com saldo ≠ 0', 'carousel-bal', balBody);
+  /* "Agendas vencidas" — mesma regra do app principal: pendente cuja
+     data/hora já passou (scheduleIsDue) OU já marcada como não realizada.
+     Não considera agendas de analistas com privilégio Suporte. */
+  const overdueRows = schedules.filter(s=>{
+      if(s.status==='concluida') return false;
+      if(!(scheduleIsDue(s) || s.status==='nao_realizada')) return false;
+      if(H.scheduleAnalystIds(s).some(id=>supportAnalystIds.has(id))) return false;
+      return true;
+    })
+    .sort((a,b)=> (a.date+'T'+(a.startTime||'00:00')).localeCompare(b.date+'T'+(b.startTime||'00:00')))
+    .map(s=>{
+      const client = s.clientId ? byId(clients, s.clientId) : null;
+      const analystNames = H.scheduleAnalystIds(s).map(id=>{ const a=byId(analysts,id); return a?a.name:null; }).filter(Boolean).join(', ');
+      return {
+        label: (client ? client.name : 'Interno') + (s.type ? ' · '+s.type : ''),
+        display: fmtDateBR(s.date) + (s.allDay ? ' · dia todo' : (s.startTime ? ' · '+s.startTime : '')),
+        color: s.status==='nao_realizada' ? 'var(--gold)' : 'var(--danger)',
+        analystNames
+      };
+    });
+  const overdueBody = overdueList(overdueRows);
+  sideHtml += chartCardCarousel('📋','Agendas vencidas','Pendentes com data já passada ou não realizadas', 'carousel-bal', overdueBody);
 
-  const perfAnalysts = analysts.filter(a=> !EXCLUDE_ANALYST_NAMES.some(n=> (a.name||'').trim().toLowerCase().includes(n)));
+  const perfAnalysts = analysts.filter(a=> !a.isSupport);
   let analystHtml;
   if(!perfAnalysts.length){
     analystHtml = '<div class="empty">Nenhum analista para exibir.</div>';
@@ -534,7 +572,7 @@ function renderDashboard(state){
     setupCarousel(document.getElementById('carousel-an'));
   });
 
-  const prazoRows = cards.filter(c=>c.commercialDate && c.startDate).map(c=>({
+  const prazoRows = visibleCards.filter(c=>c.commercialDate && c.startDate).map(c=>({
     c, client: byId(clients, c.clientId), days: daysBetweenISO(c.commercialDate, c.startDate)
   }));
   if(!prazoRows.length){
@@ -555,9 +593,9 @@ function renderDashboard(state){
   }
 }
 
-function renderAgendaDoDia(state, H, today, clients, analysts){
+function renderAgendaDoDia(state, H, today, clients, analysts, supportAnalystIds){
   document.getElementById('agenda-date').textContent = fmtDateBR(today);
-  const all = state.schedules.filter(s=> s.status!=='nao_realizada' && H.scheduleSpansDate(s, today));
+  const all = state.schedules.filter(s=> s.status!=='nao_realizada' && H.scheduleSpansDate(s, today) && !H.scheduleAnalystIds(s).some(id=>supportAnalystIds.has(id)));
   const allDayScheds = all.filter(s=>s.allDay);
   const timedScheds = all.filter(s=>!s.allDay);
 
