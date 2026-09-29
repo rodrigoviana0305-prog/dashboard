@@ -289,7 +289,9 @@ function buildHelpers(state){
   function scheduleMinutesPerAnalyst(s){
     if(s.allDay){
       if(isFeriasType(s.type)) return countWeekdaysBetweenISO(s.date, s.endDate||s.date) * FERIAS_MIN_PER_WEEKDAY;
-      return 8*60*scheduleDayCount(s);
+      // Mesma regra do app principal (implanta.html): qualquer agenda de dia
+      // todo representa a jornada cheia do analista (8h48), não 8h fixas.
+      return FERIAS_MIN_PER_WEEKDAY*scheduleDayCount(s);
     }
     return timeToMin(s.endTime)-timeToMin(s.startTime);
   }
