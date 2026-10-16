@@ -951,7 +951,44 @@ document.getElementById('tv-login').addEventListener('submit', async function(e)
   refreshLoop();
 });
 sb.auth.onAuthStateChange(function(ev){ if(ev === 'SIGNED_OUT'){ clearTimeout(refreshTimer); document.getElementById('app').style.display = 'none'; showTvLogin('Sessão encerrada. Entre novamente.'); } });
+/* Link direto: dashboard.html#u=USUARIO&p=SENHA entra sozinho (a parte depois do # nunca vai para o servidor e é apagada
+   da barra de endereço assim que lida). Salve esse link nos favoritos da TV. Depois do primeiro acesso a sessão fica salva e é renovada sozinha. */
+function readHashCredentials(){
+  try{
+    const h = String(location.hash||'').replace(/^#/, '');
+    if(!h) return null;
+    const q = new URLSearchParams(h);
+    const u = (q.get('u')||'').trim().toLowerCase(), p = q.get('p')||'';
+    if(!u || !p) return null;
+    return { u:u, p:p };
+  }catch(e){ return null; }
+}
+function clearHash(){ try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){} }
+async function keepTvSessionAlive(){
+  try{
+    const g = await sb.auth.getSession();
+    if(g && g.data && g.data.session){
+      const exp = (g.data.session.expires_at||0)*1000;
+      if(exp && exp - Date.now() < 15*60*1000) await sb.auth.refreshSession();
+    } else if(navigator.onLine !== false){
+      await sb.auth.refreshSession();
+    }
+  }catch(e){}
+}
+setInterval(keepTvSessionAlive, 10*60*1000);
+window.addEventListener('online', keepTvSessionAlive);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') keepTvSessionAlive(); });
 (async function start(){
+  const cred = readHashCredentials();
+  if(cred){
+    clearHash();
+    try{
+      const r = await sb.auth.signInWithPassword({ email: cred.u + '@' + AUTH_EMAIL_DOMAIN, password: cred.p });
+      if(r.error){ showTvLogin('O link direto está com usuário ou senha inválidos. Entre manualmente.'); return; }
+    }catch(e){ showTvLogin('Sem conexão para entrar agora. Tentando de novo...'); setTimeout(function(){ location.reload(); }, 15000); return; }
+    refreshLoop();
+    return;
+  }
   let session = null;
   try{ const g = await sb.auth.getSession(); session = g && g.data && g.data.session; }catch(e){}
   if(!session){ showTvLogin(''); return; }
