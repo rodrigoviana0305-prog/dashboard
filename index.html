@@ -268,6 +268,8 @@ function countWeekdaysBetweenISO(startIso, endIso){
   while(cur <= end){ if(cur.getDay()!==0 && cur.getDay()!==6) count++; cur.setDate(cur.getDate()+1); }
   return count;
 }
+function addDaysISO(iso,n){ const [y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()+n); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function isWeekdayISO(iso){ if(!iso) return false; const [y,m,d]=iso.split('-').map(Number); const w=new Date(y,m-1,d).getDay(); return w!==0 && w!==6; }
 function daysBetweenISO(a,b){
   const pa=a.split('-').map(Number), pb=b.split('-').map(Number);
   return Math.round((Date.UTC(pb[0],pb[1]-1,pb[2])-Date.UTC(pa[0],pa[1]-1,pa[2]))/86400000);
@@ -294,8 +296,11 @@ function buildHelpers(state){
   function isFeriasType(name){ return !!(name && name.toLowerCase()===FERIAS_TYPE_NAME.toLowerCase()); }
   function isInternalType(name){ const t=(state.agendaTypes||[]).find(t=>t.name===name); return !!(t && t.isInternal); }
   function scheduleAnalystIds(s){ return s.analystIds && s.analystIds.length ? s.analystIds : (s.analystId?[s.analystId]:[]); }
-  function scheduleDayCount(s){ if(!s.allDay) return 1; const a=new Date(s.date+'T00:00:00'), b=new Date((s.endDate||s.date)+'T00:00:00'); return Math.round((b-a)/86400000)+1; }
+  function scheduleClientIds(s){ return s.clientIds && s.clientIds.length ? s.clientIds : (s.clientId?[s.clientId]:[]); }
+  function scheduleCardIds(s){ return s.cardIds && s.cardIds.length ? s.cardIds : (s.cardId?[s.cardId]:[]); }
+  function scheduleDayCount(s){ if(!s.allDay) return 1; const a=new Date(s.date+'T00:00:00'), b=new Date((s.endDate||s.date)+'T00:00:00'); return Math.max(1, Math.round((b-a)/86400000)+1); }
   function scheduleSpansDate(s, dateISO){ if(!s.allDay) return s.date===dateISO; const endD = s.endDate || s.date; return dateISO>=s.date && dateISO<=endD; }
+  function scheduleOverlapsRange(s, start, end){ if(s.allDay) return (s.endDate||s.date) >= start && s.date <= end; return s.date >= start && s.date <= end; }
   function scheduleMinutesPerAnalyst(s){
     if(s.allDay){
       if(isFeriasType(s.type)) return countWeekdaysBetweenISO(s.date, s.endDate||s.date) * FERIAS_MIN_PER_WEEKDAY;
@@ -306,12 +311,65 @@ function buildHelpers(state){
     return timeToMin(s.endTime)-timeToMin(s.startTime);
   }
   function scheduleActualMinutes(s){ const per=scheduleMinutesPerAnalyst(s); const n=Math.max(1, scheduleAnalystIds(s).length); return per*n; }
+  /* Minutos de UM analista num dia específico (mesma regra do Painel Geral: dia todo = jornada cheia; Férias só em dia útil). */
+  function scheduleMinutesOnSpecificDay(s, day){
+    if(!s.allDay) return scheduleMinutesPerAnalyst(s);
+    if(isFeriasType(s.type)) return isWeekdayISO(day) ? FERIAS_MIN_PER_WEEKDAY : 0;
+    return FERIAS_MIN_PER_WEEKDAY;
+  }
+  /* Horas trabalhadas (concluídas) de um analista no intervalo, somadas dia a dia — igual ao Painel Geral e aos Relatórios. */
+  function analystMinutesInRange(analystId, startISO, endISO, pred){
+    let total = 0;
+    for(let d=startISO; d<=endISO; d=addDaysISO(d,1)){
+      (state.schedules||[]).forEach(s=>{
+        if(s.status!=='concluida') return;
+        if(!scheduleSpansDate(s, d)) return;
+        if(pred && !pred(s)) return;
+        if(!scheduleAnalystIds(s).includes(analystId)) return;
+        total += scheduleMinutesOnSpecificDay(s, d);
+      });
+    }
+    return total;
+  }
+  /* ----- cards: situação e REGRA ÚNICA de contratado/usado/saldo (mesma do implanta.html) ----- */
+  const DONE_NAMES = ['concluido','concluidos','concluida','finalizado','fechado'];
+  const COMMERCIAL_NAMES = ['comercial','comerciais','commercial','comercio'];
+  function norm(h){ return String(h||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+  function cardStatusKey(card){
+    const b = (state.boards||[]).find(x=>x.id===card.boardId);
+    const l = b ? (b.lists||[]).find(x=>x.id===card.listId) : null;
+    const n = l ? l.name : '';
+    if(/cancel/i.test(String(n||''))) return 'cancelado';
+    if(COMMERCIAL_NAMES.some(x=> norm(n)===x || norm(n).startsWith(x)) || /pausad|parad/i.test(norm(n))) return 'parado';
+    if(card.isConcluded || DONE_NAMES.some(x=> norm(n)===x || norm(n).startsWith(x))) return 'concluido';
+    return 'ativo';
+  }
+  function cardIsActive(card){ return cardStatusKey(card)==='ativo'; }
+  function cardIsClosed(card){ return !!card.isConcluded || cardStatusKey(card)==='concluido'; }
   function cardUsedMinutes(card){
-    return (state.schedules||[]).filter(s=>s.cardId===card.id && s.status==='concluida')
+    return (state.schedules||[]).filter(s=>scheduleCardIds(s).includes(card.id) && s.status==='concluida')
       .reduce((sum,s)=> sum + (s.deductMinutes!=null ? s.deductMinutes : scheduleActualMinutes(s)), 0);
   }
   function cardBalanceHours(card){ if(card.balanceForfeited) return 0; return (card.contractedHours||0) - cardUsedMinutes(card)/60; }
-  return { isFeriasType, isInternalType, scheduleAnalystIds, scheduleSpansDate, scheduleMinutesPerAnalyst, scheduleActualMinutes, cardUsedMinutes, cardBalanceHours };
+  function cardBalanceForReporting(card){ if(cardIsClosed(card) || card.balanceForfeited) return 0; return cardBalanceHours(card); }
+  function cardContractedForReporting(card){ if(cardIsClosed(card) || card.balanceForfeited) return cardUsedMinutes(card)/60; return Number(card.contractedHours||0); }
+  function reportTotals(cards){
+    let contracted=0, usedMin=0, balance=0;
+    cards.forEach(c=>{ contracted+=cardContractedForReporting(c); usedMin+=cardUsedMinutes(c); balance+=cardBalanceForReporting(c); });
+    return {contracted, usedMin, used:usedMin/60, balance};
+  }
+  /* ----- horas NÃO ABATIDAS: agenda interna concluída sem card (mas com cliente) ou com abatimento zerado; cada agenda conta UMA vez ----- */
+  function naoAbatidoTotalMinutes(){
+    let t = 0;
+    (state.schedules||[]).forEach(s=>{
+      if(s.status!=='concluida' || !isInternalType(s.type)) return;
+      const hasCard = scheduleCardIds(s).length>0;
+      const ok = hasCard ? s.deductMinutes===0 : scheduleClientIds(s).length>0;
+      if(ok) t += scheduleActualMinutes(s);
+    });
+    return t;
+  }
+  return { isFeriasType, isInternalType, scheduleAnalystIds, scheduleClientIds, scheduleCardIds, scheduleSpansDate, scheduleOverlapsRange, scheduleMinutesPerAnalyst, scheduleActualMinutes, analystMinutesInRange, cardIsActive, cardIsClosed, cardUsedMinutes, cardBalanceHours, cardBalanceForReporting, cardContractedForReporting, reportTotals, naoAbatidoTotalMinutes };
 }
 function byId(arr, id){ return (arr||[]).find(x=>x.id===id); }
 
@@ -482,35 +540,20 @@ function renderDashboard(state){
   const visibleCards = cards.filter(c=> !supportBoardIds.has(c.boardId));
   const visibleSchedules = schedules.filter(s=> !H.scheduleAnalystIds(s).some(id=>supportAnalystIds.has(id)));
 
-  const activeCards = visibleCards.filter(c=>!c.isConcluded);
+  /* "Em andamento" = situação Ativa (mesmo critério do app: fora Concluído, Parado/Comercial e Cancelado). */
+  const activeCards = visibleCards.filter(c=>H.cardIsActive(c));
   const monthRange = currentMonthRange();
   const today = todayISO();
 
-  /* Mesma regra do app principal (implanta.html): um card CONCLUÍDO não
-     mantém saldo "disponível" na soma total — a sobra que ficou ao
-     concluir não é contabilizada aqui (ver kpiCard "Horas contratadas"
-     no relatório do app principal: "saldo de concluídos não permanece no
-     contratado"). Sem este ajuste, este total diverge do Painel Geral do
-     implanta.html sempre que houver cards concluídos com saldo positivo
-     ou negativo remanescente. */
-  const totalBalance = visibleCards.reduce((s,c)=> s + (c.isConcluded ? 0 : H.cardBalanceHours(c)), 0);
+  /* REGRA ÚNICA (mesma do implanta.html): saldo/horas usadas pelos mesmos cálculos dos Relatórios e do Painel Geral;
+     card concluído ou com saldo zerado não mantém saldo. Horas abatidas = soma do abatido de todos os cards
+     (igual ao KPI "Horas usadas" dos Relatórios). */
+  const totals = H.reportTotals(visibleCards);
+  const totalBalance = totals.balance;
+  const totalAbatidoMin = totals.usedMin;
 
-  let totalAbatidoMin = 0;
-  visibleSchedules.forEach(s=>{
-    if(s.status!=='concluida') return;
-    if(!s.cardId) return;
-    if(s.deductMinutes === 0) return;
-    totalAbatidoMin += (s.deductMinutes != null ? s.deductMinutes : H.scheduleActualMinutes(s));
-  });
-
-  const naoAbatidoByClient = {};
-  visibleSchedules.forEach(s=>{
-    if(s.status!=='concluida' || !H.isInternalType(s.type) || !s.clientId) return;
-    const isUnlinked = !s.cardId, isZeroed = s.cardId && s.deductMinutes===0;
-    if(!isUnlinked && !isZeroed) return;
-    naoAbatidoByClient[s.clientId] = (naoAbatidoByClient[s.clientId]||0) + H.scheduleActualMinutes(s);
-  });
-  const totalNaoAbatido = Object.values(naoAbatidoByClient).reduce((s,v)=>s+v,0);
+  /* Horas sem abatimento: agenda interna concluída sem card (com cliente) ou com abatimento zerado; cada agenda conta uma vez. */
+  const totalNaoAbatido = H.naoAbatidoTotalMinutes();
 
   document.getElementById('kpis').innerHTML =
       kpi('📁','Projetos em andamento', activeCards.length)
@@ -526,7 +569,7 @@ function renderDashboard(state){
     const analyst = board ? byId(analysts, board.analystId) : null;
     const used = H.cardUsedMinutes(c)/60;
     const pct = c.contractedHours ? Math.min(100, Math.max(0,(used/c.contractedHours)*100)) : 0;
-    const bal = H.cardBalanceHours(c);
+    const bal = H.cardBalanceForReporting(c);
     return {client, analyst, pct, bal, productTagIds: c.productTags || []};
   }).sort((a,b)=> b.pct-a.pct);
 
@@ -566,12 +609,12 @@ function renderDashboard(state){
     analystHtml = '<div class="empty">Nenhum analista para exibir.</div>';
   } else {
     const rows = perfAnalysts.map(a=>{
-      const scheds = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && dateInRange(s.date, monthRange));
-      const totalMin = scheds.reduce((sum,s)=> sum + H.scheduleMinutesPerAnalyst(s), 0);
+      const scheds = schedules.filter(s=> H.scheduleAnalystIds(s).includes(a.id) && s.status==='concluida' && H.scheduleOverlapsRange(s, monthRange.start, monthRange.end));
+      const totalMin = H.analystMinutesInRange(a.id, monthRange.start, monthRange.end, null);   // mesma conta do Painel Geral e dos Relatórios
       const board = boards.find(b=>b.analystId===a.id);
-      const cardCount = board ? cards.filter(c=>c.boardId===board.id).length : 0;
+      const cardCount = board ? new Set(cards.filter(c=>c.boardId===board.id && H.cardIsActive(c)).map(c=>c.clientId)).size : 0;   // clientes com card em andamento
       return {a, sessions:scheds.length, totalMin, cardCount};
-    }).sort((x,y)=> y.totalMin-x.totalMin);
+    }).filter(r=> !r.a.inactive || r.totalMin>0).sort((x,y)=> y.totalMin-x.totalMin);
     analystHtml = '<div class="analyst-grid">' + rows.map(({a,sessions,totalMin,cardCount})=>{
       return '<div class="analyst-card" style="border-left-color:'+(a.inactive?'#B9CAD5':a.color)+';">'
         + '<div class="analyst-card-head"><div class="analyst-avatar" style="background:'+(a.inactive?'#B9CAD5':a.color)+';">'+esc((a.name||'?').charAt(0).toUpperCase())+'</div>'
