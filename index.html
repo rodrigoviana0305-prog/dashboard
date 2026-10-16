@@ -538,7 +538,8 @@ function renderDashboard(state){
   const supportAnalystIds = new Set(analysts.filter(a=>a.isSupport).map(a=>a.id));
   const supportBoardIds = new Set(boards.filter(b=>supportAnalystIds.has(b.analystId)).map(b=>b.id));
   const visibleCards = cards.filter(c=> !supportBoardIds.has(c.boardId));
-  const visibleSchedules = schedules.filter(s=> !H.scheduleAnalystIds(s).some(id=>supportAnalystIds.has(id)));
+  const hiddenAnalystIds = new Set(analysts.filter(a=>a.isSupport||a.isManager).map(a=>a.id));   // Suporte e Gestor não entram nas horas/listas
+  const visibleSchedules = schedules.filter(s=>{ const ids=H.scheduleAnalystIds(s); return !ids.length || ids.some(id=>!hiddenAnalystIds.has(id)); });
 
   /* "Em andamento" = situação Ativa (mesmo critério do app: fora Concluído, Parado/Comercial e Cancelado). */
   const activeCards = visibleCards.filter(c=>H.cardIsActive(c));
@@ -603,7 +604,7 @@ function renderDashboard(state){
   const overdueBody = overdueList(overdueRows);
   sideHtml += chartCardCarousel('📋','Agendas vencidas','Pendentes com data já passada ou não realizadas', 'carousel-bal', overdueBody);
 
-  const perfAnalysts = analysts.filter(a=> !a.isSupport);
+  const perfAnalysts = analysts.filter(a=> !a.isSupport && !a.isManager);
   let analystHtml;
   if(!perfAnalysts.length){
     analystHtml = '<div class="empty">Nenhum analista para exibir.</div>';
