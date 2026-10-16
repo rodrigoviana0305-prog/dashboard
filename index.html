@@ -192,6 +192,14 @@
 </div>
 
 <div id="loading">Carregando dados…</div>
+<form id="tv-login" style="display:none;margin:auto;max-width:360px;width:90%;padding:28px;border-radius:16px;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.15);flex-direction:column;gap:12px;font-family:inherit;">
+  <h2 style="margin:0 0 4px;font-size:22px;">Dashboard NEO</h2>
+  <p style="margin:0 0 6px;color:#5b6b78;font-size:14px;">Entre com o usuário de visualização. Só é pedido uma vez neste aparelho.</p>
+  <input id="tv-user" type="text" placeholder="Usuário" autocomplete="username" style="padding:12px;font-size:16px;border:1px solid #cfd8df;border-radius:10px;">
+  <input id="tv-pass" type="password" placeholder="Senha" autocomplete="current-password" style="padding:12px;font-size:16px;border:1px solid #cfd8df;border-radius:10px;">
+  <div id="tv-err" style="color:#b42318;font-size:13px;min-height:16px;"></div>
+  <button type="submit" style="padding:12px;font-size:16px;border:0;border-radius:10px;background:#0B5C8E;color:#fff;cursor:pointer;">Entrar</button>
+</form>
 <div id="error"></div>
 
 <div class="main" id="app" style="display:none;">
@@ -223,7 +231,9 @@
 const SUPABASE_URL = 'https://pfabqqdhvacakszoklxh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0lFYSvX-C7n3Y1FVZ4RWvQ_8HVOCxQI';
 const REFRESH_MS = 7200000; // 2 horas
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const AUTH_EMAIL_DOMAIN = 'implanta.realtec.com.br';
+/* O banco só responde a usuários logados. O login é pedido uma vez e fica salvo neste aparelho. */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:'neo_dashboard_auth_v1' } });
 
 /* Banco dividido em tabelas por entidade — o dashboard (somente leitura)
    consulta a tabela sync_meta primeiro (carimbos de data, poucos bytes) e só
@@ -813,6 +823,7 @@ let firstLoadDone = false;
 
 async function refreshLoop(){
   if(refreshInFlight) return;
+  try{ const g = await sb.auth.getSession(); if(!(g && g.data && g.data.session)){ showTvLogin(''); return; } }catch(e){}
   refreshInFlight = true;
   const startedAt = Date.now();
   try{
@@ -874,7 +885,34 @@ setInterval(()=>{
   }
 }, 60000);
 
-refreshLoop();
+/* ---------- Login (uma vez por aparelho) ---------- */
+function showTvLogin(msg){
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+  const f = document.getElementById('tv-login');
+  f.style.display = 'flex';
+  document.getElementById('tv-err').textContent = msg || '';
+}
+document.getElementById('tv-login').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const u = document.getElementById('tv-user').value.trim().toLowerCase();
+  const p = document.getElementById('tv-pass').value;
+  if(!u || !p){ document.getElementById('tv-err').textContent = 'Preencha usuário e senha.'; return; }
+  const r = await sb.auth.signInWithPassword({ email: u + '@' + AUTH_EMAIL_DOMAIN, password: p });
+  if(r.error){ document.getElementById('tv-err').textContent = 'Usuário ou senha inválidos.'; return; }
+  document.getElementById('tv-pass').value = '';
+  document.getElementById('tv-login').style.display = 'none';
+  document.getElementById('loading').style.display = 'flex';
+  firstLoadDone = false; lastKnownUpdatedAt = null;
+  refreshLoop();
+});
+sb.auth.onAuthStateChange(function(ev){ if(ev === 'SIGNED_OUT'){ clearTimeout(refreshTimer); document.getElementById('app').style.display = 'none'; showTvLogin('Sessão encerrada. Entre novamente.'); } });
+(async function start(){
+  let session = null;
+  try{ const g = await sb.auth.getSession(); session = g && g.data && g.data.session; }catch(e){}
+  if(!session){ showTvLogin(''); return; }
+  refreshLoop();
+})();
 </script>
 </body>
 </html>
