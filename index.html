@@ -231,8 +231,8 @@ const AUTH_EMAIL_DOMAIN = 'implanta.realtec.com.br';
 /* LOGIN AUTOMÁTICO (sem tela de login): preencha o usuário e a senha da conta SOMENTE LEITURA da TV.
    Atenção: se este arquivo estiver num repositório público, qualquer pessoa consegue ler estas duas linhas. Use uma conta
    exclusiva para o dashboard (perfil Gestor, sem poder de alterar nada) e troque a senha se precisar revogar o acesso. */
-const TV_LOGIN_USER = '';
-const TV_LOGIN_PASS = '';
+const TV_LOGIN_USER = 'rodrigo.soares';
+const TV_LOGIN_PASS = '71209403';
 /* O banco só responde a usuários logados. O login é pedido uma vez e fica salvo neste aparelho. */
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:'neo_dashboard_auth_v1' } });
 
